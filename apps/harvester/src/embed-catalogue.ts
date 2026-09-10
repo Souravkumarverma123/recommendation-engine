@@ -20,8 +20,6 @@ export interface EmbedCatalogueOptions {
   provider: EmbeddingProvider;
   /** Rows per embedding request. Default 128. */
   batchSize?: number;
-  /** Stop after embedding this many rows — for a bounded smoke run. */
-  maxRows?: number;
   /** Called after each batch, with the running embedded total. */
   onProgress?: (embedded: number) => void;
 }
@@ -30,6 +28,12 @@ export interface EmbedCatalogueResult {
   embedded: number;
 }
 
+/**
+ * Embed every `standards` row still missing a vector, in batches. A bounded
+ * `--limit` harvest fetches fewer rows but still embeds all of them here — the
+ * only "extra" work is clearing a pre-existing backlog, which search needs
+ * anyway. Resumable: a crash or re-run just picks up the rows still null.
+ */
 export async function embedCatalogue(
   options: EmbedCatalogueOptions,
 ): Promise<EmbedCatalogueResult> {
@@ -37,9 +41,6 @@ export async function embedCatalogue(
   let embedded = 0;
 
   for (;;) {
-    const remaining = options.maxRows != null ? options.maxRows - embedded : batchSize;
-    if (remaining <= 0) break;
-
     const rows = await db
       .select({
         id: standardsTable.id,
@@ -49,7 +50,7 @@ export async function embedCatalogue(
       })
       .from(standardsTable)
       .where(isNull(standardsTable.embedding))
-      .limit(Math.min(batchSize, remaining));
+      .limit(batchSize);
 
     if (rows.length === 0) break;
 
@@ -60,16 +61,21 @@ export async function embedCatalogue(
       for (const [i, row] of rows.entries()) {
         const vector = vectors[i];
         if (!vector) continue;
-        await tx.execute(
-          sql`update standards set embedding = ${`[${vector.join(",")}]`}::vector where id = ${row.id}`,
+        // Re-check `embedding is null` and the exact title we embedded: a
+        // concurrent harvester must not double-write, and a title changed
+        // underneath us must not get a now-stale vector.
+        const updated = await tx.execute(
+          sql`update standards set embedding = ${`[${vector.join(",")}]`}::vector
+              where id = ${row.id} and embedding is null and title = ${row.title}`,
         );
-        wrote += 1;
+        wrote += updated.rowCount ?? 0;
       }
     });
 
     if (wrote === 0) {
       throw new Error(
-        `embedding provider returned no usable vectors for a batch of ${rows.length} rows`,
+        `embedded no rows from a batch of ${rows.length} — provider returned no ` +
+          `usable vectors, or another process is embedding the same rows`,
       );
     }
 

@@ -8,6 +8,7 @@ export const harvestKindValues = [
   "amendments",
   "committees",
   "qco",
+  "embeddings",
 ] as const;
 export type HarvestKind = (typeof harvestKindValues)[number];
 

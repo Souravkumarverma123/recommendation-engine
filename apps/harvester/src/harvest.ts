@@ -24,7 +24,7 @@ export interface RunHarvestOptions {
   catalogueBatchSize?: number;
   embedBatchSize?: number;
   pageSize?: number;
-  /** Bound the run — stop after this many catalogue rows (and embed at most this many). */
+  /** Bound the run — stop after this many catalogue rows. */
   maxItems?: number;
   logger?: Pick<Console, "info" | "warn">;
 }
@@ -65,12 +65,16 @@ export async function runHarvest(options: RunHarvestOptions): Promise<RunHarvest
 
   let embedded = 0;
   if (provider) {
-    ({ embedded } = await embedCatalogue({
-      provider,
-      batchSize: options.embedBatchSize,
-      maxRows: options.maxItems,
-      onProgress: (n) => log.info(`  … ${n} standards embedded`),
-    }));
+    // Its own `harvest_runs` row: an embedding failure must not leave the run
+    // that just wrote ~24k rows looking like it also finished the vectors.
+    await withHarvestRun("embeddings", async () => {
+      ({ embedded } = await embedCatalogue({
+        provider,
+        batchSize: options.embedBatchSize,
+        onProgress: (n) => log.info(`  … ${n} standards embedded`),
+      }));
+      return { recordCount: embedded };
+    });
     log.info(`embedding backfill: ${embedded} standard(s) embedded`);
   } else {
     log.warn(

@@ -76,6 +76,13 @@ describe("mapListItem — one catalogue row → a standards insert", () => {
     expect(mapListItem({ ...ROW, publishedOn: "not-a-date" })?.publishedOn).toBeNull();
   });
 
+  it("rejects an impossible calendar date rather than passing it to Postgres", () => {
+    expect(mapListItem({ ...ROW, publishedOn: "2026-99-99" })?.publishedOn).toBeNull();
+    expect(mapListItem({ ...ROW, publishedOn: "2026-02-30" })?.publishedOn).toBeNull();
+    expect(mapListItem({ ...ROW, publishedOn: "0000-00-00" })?.publishedOn).toBeNull();
+    expect(mapListItem({ ...ROW, publishedOn: "2024-02-29" })?.publishedOn).toBe("2024-02-29");
+  });
+
   it("has no edition year when the designation carries none", () => {
     expect(mapListItem({ ...ROW, standardNumber: "IS 8112" })?.editionYear).toBeNull();
   });

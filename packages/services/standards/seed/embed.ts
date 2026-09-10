@@ -9,7 +9,7 @@
  *
  * Idempotent: re-running overwrites the vectors in place.
  */
-import { db, inArray, sql } from "@repo/database";
+import { and, db, inArray, isNotNull, sql } from "@repo/database";
 import { standardsTable } from "@repo/database/schema";
 import type { EmbeddingProvider } from "../../llm/embeddings";
 import { parseDesignation } from "../../bis/designation";
@@ -32,9 +32,11 @@ export interface EmbedResult {
  * Embed every seeded demo standard and store the vector. Reads the rows back
  * from the DB (not the data file) so it always embeds exactly what was loaded.
  *
- * Matched on the normalised designation, not the reserved demo id band, so it
- * covers both a bare seed (demo-band rows) and a post-harvest top-up (the
- * reviewed detail fields now living on the real catalogue row — ticket #9).
+ * Matched on the normalised designation plus a non-null `summary` — the demo
+ * loader writes a summary onto exactly one row per reviewed standard (a demo-band
+ * row on a bare seed, the harvested catalogue row on a post-harvest top-up), and
+ * nothing else in `standards` carries one. That keeps this from also embedding
+ * unrelated editions or Hindi entries that share a yearless key (ticket #9).
  */
 export async function embedDemoStandards(
   provider: EmbeddingProvider,
@@ -50,7 +52,7 @@ export async function embedDemoStandards(
       summary: standardsTable.summary,
     })
     .from(standardsTable)
-    .where(inArray(standardsTable.numberNormalized, keys));
+    .where(and(inArray(standardsTable.numberNormalized, keys), isNotNull(standardsTable.summary)));
 
   if (rows.length === 0) return { embedded: 0 };
 

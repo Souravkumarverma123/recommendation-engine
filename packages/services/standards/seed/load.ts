@@ -23,7 +23,7 @@
  * repo root). The `standards.search` seam test also calls `loadDemoStandards()`
  * directly from its global setup.
  */
-import { and, db, eq, gte, lt, notInArray, sql } from "@repo/database";
+import { and, db, eq, gte, inArray, lt, notInArray, sql } from "@repo/database";
 import { standardsTable, type InsertStandard } from "@repo/database/schema";
 import { parseDesignation } from "../../bis/designation";
 import {
@@ -88,24 +88,36 @@ export async function loadDemoStandards(): Promise<LoadResult> {
     const seedRows: InsertStandard[] = [];
     let toppedUp = 0;
 
-    for (const row of rows) {
-      // A normalised key can match several harvested rows (multiple editions,
-      // English + Hindi entries). Enrich exactly one: an exact designation match
-      // first, otherwise the newest edition.
-      const [target] = await tx
-        .select({ id: standardsTable.id })
-        .from(standardsTable)
-        .where(
-          and(
-            eq(standardsTable.numberNormalized, row.numberNormalized),
-            lt(standardsTable.bisStandardId, DEMO_BIS_ID_MIN),
+    // One read for every reviewed designation, then resolve the target row in
+    // memory. A normalised key can match several harvested rows (multiple
+    // editions, English + Hindi entries); the winner is an exact designation
+    // match, otherwise the newest edition.
+    const candidates = await tx
+      .select({
+        id: standardsTable.id,
+        key: standardsTable.numberNormalized,
+        number: standardsTable.number,
+        editionYear: standardsTable.editionYear,
+      })
+      .from(standardsTable)
+      .where(
+        and(
+          inArray(
+            standardsTable.numberNormalized,
+            rows.map((row) => row.numberNormalized),
           ),
-        )
-        .orderBy(
-          sql`(${standardsTable.number} = ${row.number}) desc`,
-          sql`${standardsTable.editionYear} desc nulls last`,
-        )
-        .limit(1);
+          lt(standardsTable.bisStandardId, DEMO_BIS_ID_MIN),
+        ),
+      );
+
+    for (const row of rows) {
+      const target = candidates
+        .filter((c) => c.key === row.numberNormalized)
+        .sort(
+          (a, b) =>
+            Number(b.number === row.number) - Number(a.number === row.number) ||
+            (b.editionYear ?? 0) - (a.editionYear ?? 0),
+        )[0];
 
       if (target) {
         await tx

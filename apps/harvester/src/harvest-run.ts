@@ -42,14 +42,22 @@ export async function withHarvestRun(
       .where(eq(harvestRunsTable.id, runId));
     return outcome;
   } catch (error) {
-    await db
-      .update(harvestRunsTable)
-      .set({
-        finishedAt: new Date(),
-        ok: "false",
-        notes: String(error instanceof Error ? error.stack ?? error.message : error).slice(0, 2000),
-      })
-      .where(eq(harvestRunsTable.id, runId));
+    // Never let a bookkeeping failure mask the real error — record best-effort
+    // and always re-throw the original.
+    try {
+      await db
+        .update(harvestRunsTable)
+        .set({
+          finishedAt: new Date(),
+          ok: "false",
+          notes: String(
+            error instanceof Error ? error.stack ?? error.message : error,
+          ).slice(0, 2000),
+        })
+        .where(eq(harvestRunsTable.id, runId));
+    } catch (recordError) {
+      console.error(`harvest-run ${runId}: could not record failure`, recordError);
+    }
     throw error;
   }
 }

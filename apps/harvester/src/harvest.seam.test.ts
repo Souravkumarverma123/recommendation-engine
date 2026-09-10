@@ -4,6 +4,7 @@ import { and, db, desc, eq, gte, lt } from "@repo/database";
 import { harvestRunsTable, standardsTable } from "@repo/database/schema";
 import { runMigrations } from "@repo/database/migrate";
 import type { BisListItem } from "@repo/services/bis/model";
+import type { EmbeddingProvider } from "@repo/services/llm/embeddings";
 import { fakeEmbeddingProvider } from "@repo/services/test/fake-embeddings";
 import { DEMO_BIS_ID_MIN } from "@repo/services/standards/seed/demo-standards.data";
 import { embedDemoStandards } from "@repo/services/standards/seed/embed";
@@ -147,6 +148,38 @@ describe("full-catalogue harvest", () => {
     const search = new StandardsService({ embeddings: null });
     const { results } = await search.search({ query: "reinforced concrete water tanks" });
     expect(results.map((r) => r.number)).toContain("IS 99801:2021");
+  });
+
+  it("records the embedding backfill as its own harvest_runs row", async () => {
+    const [run] = await db
+      .select()
+      .from(harvestRunsTable)
+      .where(eq(harvestRunsTable.kind, "embeddings"))
+      .orderBy(desc(harvestRunsTable.startedAt))
+      .limit(1);
+    expect(run?.ok).toBe("true");
+    expect(run?.recordCount).toBe(PARSEABLE);
+  });
+
+  it("fails the embeddings run — not the list run — when embedding throws", async () => {
+    await resetToDemoSlice();
+    const brokenEmbedder: EmbeddingProvider = {
+      embed: () => Promise.reject(new Error("embedding provider down")),
+    };
+
+    await expect(
+      runHarvest({ client: fakeClient(FAKE_CATALOGUE), embeddings: brokenEmbedder }),
+    ).rejects.toThrow("embedding provider down");
+
+    const runs = await db
+      .select()
+      .from(harvestRunsTable)
+      .orderBy(desc(harvestRunsTable.startedAt));
+    const list = runs.find((r) => r.kind === "list");
+    const embeddings = runs.find((r) => r.kind === "embeddings");
+    expect(list?.ok).toBe("true");
+    expect(embeddings?.ok).toBe("false");
+    expect(embeddings?.notes).toContain("embedding provider down");
   });
 
   it("is idempotent — a second run neither duplicates nor errors", async () => {
