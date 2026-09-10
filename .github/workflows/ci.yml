@@ -1,9 +1,10 @@
 name: CI
 
 on:
+  # Every PR, whatever its base — so stacked PRs (e.g. one based on another
+  # feature branch) also get checked, not just PRs that target main directly.
   pull_request:
-    branches: [main]
-  # Allow the same checks on pushes to main (e.g. after a merge / for branch-protection status history).
+  # And on pushes to main (post-merge history / branch-protection status).
   push:
     branches: [main]
 
