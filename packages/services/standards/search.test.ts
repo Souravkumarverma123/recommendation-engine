@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
+import { fakeEmbeddingProvider } from "../test/fake-embeddings";
 import { prepareDemoDatabase } from "../test/prepare-db";
 import { StandardsService } from "./index";
 import { standardSearchHitSchema } from "./model";
@@ -16,7 +17,7 @@ beforeAll(prepareDemoDatabase);
  * the template for the hybrid-search and pipeline seams that build on it.
  */
 
-const service = new StandardsService();
+const service = new StandardsService({ embeddings: fakeEmbeddingProvider });
 
 function numbersFor(query: string, limit?: number) {
   return service
