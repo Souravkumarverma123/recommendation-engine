@@ -2,6 +2,11 @@
   "$schema": "https://turborepo.com/schema.json",
   "ui": "tui",
   "globalEnv": ["NODE_ENV", "SKIP_ENV_VALIDATION"],
+  // Turbo 2.x runs tasks in strict env mode: undeclared vars are hidden from task
+  // processes. DATABASE_URL is infra location (not a deterministic cache input), so
+  // it is passed through rather than hashed. The DB-backed recommend.run seam (#8)
+  // needs it; today no task reads it.
+  "globalPassThroughEnv": ["DATABASE_URL"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
