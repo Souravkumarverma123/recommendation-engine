@@ -115,6 +115,13 @@ function pickObligation(
   return { status: best.status, citation: buildCitation(best.row) };
 }
 
+/**
+ * The temporal verdict for one obligation row. A row the gazette already marks
+ * `UPCOMING` stays that way; an otherwise-mandatory row is still `UPCOMING`
+ * until its enforcement date arrives — "from when does the requirement bite" is
+ * exactly what the badge answers (docs/PRD.md user story 14). A row with no
+ * date (a long-standing QCO like Cement 2003) is `MANDATORY`.
+ */
 function resolveStatus(row: ObligationRow): "MANDATORY" | "UPCOMING" {
   if (row.obStatus === "UPCOMING") return "UPCOMING";
   return isFutureDate(row.enforcementDate) ? "UPCOMING" : "MANDATORY";

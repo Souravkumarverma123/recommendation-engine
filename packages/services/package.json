@@ -6,8 +6,7 @@
     "lint": "eslint .",
     "check-types": "tsc --noEmit",
     "test": "vitest run",
-    "db:seed": "dotenv -- tsx standards/seed/load.cli.ts",
-    "db:seed:qco": "dotenv -- tsx qco/seed/load.cli.ts"
+    "db:seed": "dotenv -- tsx standards/seed/load.cli.ts"
   },
   "devDependencies": {
     "@repo/eslint-config": "workspace:*",

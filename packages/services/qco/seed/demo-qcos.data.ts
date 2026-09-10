@@ -18,7 +18,14 @@
 /** Certification scheme the obligation runs through (`qcos` schema). */
 export type QcoScheme = "I" | "II" | "IV" | "X";
 
-/** MANDATORY = in force now; UPCOMING = notified with a future enforcement date. */
+/**
+ * How the gazette records this obligation. `UPCOMING` is for a QCO notified
+ * with no firm date yet; `MANDATORY` is everything else. This is the *source*
+ * status — `QcoService` still downgrades a `MANDATORY` row to the `UPCOMING`
+ * badge while its `enforcementDate` is in the future (that is the point of the
+ * badge — see `resolveStatus`). Not the same enum as the output
+ * `RegulatoryStatus`.
+ */
 export type ObligationStatus = "MANDATORY" | "UPCOMING";
 
 export interface DemoObligation {
@@ -40,6 +47,12 @@ export interface DemoObligation {
 export interface DemoQco {
   /** Full order title as gazetted. */
   title: string;
+  /**
+   * S.O. numbers oldest → newest. The **last** is the order currently in force;
+   * the earlier ones are its superseded amendments (the Steel QCO has five).
+   * A tender cites the operative one, so the UI shows only the last — the full
+   * chain belongs in a history view, not the badge line.
+   */
   soNumbers: string[];
   soDates: string[]; // ISO, aligned to soNumbers
   ministry: string;

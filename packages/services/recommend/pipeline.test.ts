@@ -1,12 +1,14 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { fakeEmbeddingProvider } from "../test/fake-embeddings";
+import { freezeClock } from "../test/frozen-clock";
 import { prepareDemoDatabase } from "../test/prepare-db";
 import { QcoService } from "../qco";
 import { regulatoryStatusSchema } from "../qco/model";
 import { StandardsService } from "../standards";
 import { RecommendService } from "./index";
 
+freezeClock();
 beforeAll(prepareDemoDatabase);
 
 /**

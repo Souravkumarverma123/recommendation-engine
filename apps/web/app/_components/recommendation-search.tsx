@@ -54,6 +54,7 @@ function QcoCitationLine({ result }: { result: Recommendation }) {
   return (
     <p className="text-muted-foreground text-xs">
       {qco.title}
+      {/* soNumbers is oldest→newest; the last is the order currently in force. */}
       {qco.soNumbers.length > 0 && <> · {qco.soNumbers[qco.soNumbers.length - 1]}</>}
       {qco.scheme && <> · Scheme {qco.scheme}</>}
       {qco.enforcementDate && <> · in force from {formatDate(qco.enforcementDate)}</>}

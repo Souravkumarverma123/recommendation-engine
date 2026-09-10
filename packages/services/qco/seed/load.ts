@@ -10,8 +10,9 @@
  * designation (`parseDesignation`) against `standards.number_normalized`, so the
  * regulatory layer links to the catalogue without depending on it at query time.
  *
- * Run with `pnpm --filter @repo/services db:seed:qco`. The seam tests call
- * `loadDemoQcos()` directly from their DB bootstrap.
+ * `pnpm db:seed` runs this after the catalogue load (so obligation → standard
+ * FKs resolve); the seam tests call `loadDemoQcos()` directly from their DB
+ * bootstrap.
  */
 import { db } from "@repo/database";
 import {

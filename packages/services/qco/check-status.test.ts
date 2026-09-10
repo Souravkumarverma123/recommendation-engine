@@ -1,8 +1,10 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { DEMO_NOW, freezeClock } from "../test/frozen-clock";
 import { prepareDemoDatabase } from "../test/prepare-db";
 import { QcoService } from "./index";
 
+freezeClock();
 beforeAll(prepareDemoDatabase);
 
 /**
@@ -81,5 +83,17 @@ describe("qco.checkStatus — independent regulatory check", () => {
       productText: "500 ergonomic office chairs for a government secretariat",
     });
     expect(chair.status).toBe("VOLUNTARY");
+  });
+
+  describe("when the enforcement date is still in the future", () => {
+    beforeAll(() => vi.setSystemTime(new Date("2026-03-01T00:00:00Z")));
+    afterAll(() => vi.setSystemTime(DEMO_NOW));
+
+    it("reads the Furniture QCO as UPCOMING, still with its enforcement date", async () => {
+      const result = await qco.checkStatus({ isNumber: "IS 17631:2022" });
+      expect(result.status).toBe("UPCOMING");
+      expect(result.qco?.enforcementDate).toBe("2026-08-14");
+      expect(result.qco?.soNumbers).toContain("S.O. 801(E)");
+    });
   });
 });
