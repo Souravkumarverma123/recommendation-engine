@@ -41,7 +41,12 @@ export interface HarvestCatalogueResult {
   upserted: number;
   /** Rows whose designation could not be parsed and were left out. */
   skipped: number;
+  /** Up to 25 of the skipped designations, for diagnosing parser gaps. */
+  skippedSamples: string[];
 }
+
+/** How many skipped designations to keep for the run's diagnostics. */
+const SKIPPED_SAMPLE_LIMIT = 25;
 
 export async function harvestCatalogue(
   options: HarvestCatalogueOptions,
@@ -50,6 +55,7 @@ export async function harvestCatalogue(
   let fetched = 0;
   let upserted = 0;
   let skipped = 0;
+  const skippedSamples: string[] = [];
   let batch: InsertStandard[] = [];
 
   const flush = async () => {
@@ -68,12 +74,15 @@ export async function harvestCatalogue(
       if (batch.length >= batchSize) await flush();
     } else {
       skipped += 1;
+      if (skippedSamples.length < SKIPPED_SAMPLE_LIMIT) {
+        skippedSamples.push(item.standardNumber);
+      }
     }
     if (options.maxItems != null && fetched >= options.maxItems) break;
   }
   await flush();
 
-  return { fetched, upserted, skipped };
+  return { fetched, upserted, skipped, skippedSamples };
 }
 
 /**

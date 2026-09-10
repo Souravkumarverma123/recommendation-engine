@@ -5,6 +5,8 @@ import { harvestRunsTable, standardsTable } from "@repo/database/schema";
 import { runMigrations } from "@repo/database/migrate";
 import type { BisListItem } from "@repo/services/bis/model";
 import { fakeEmbeddingProvider } from "@repo/services/test/fake-embeddings";
+import { DEMO_BIS_ID_MIN } from "@repo/services/standards/seed/demo-standards.data";
+import { embedDemoStandards } from "@repo/services/standards/seed/embed";
 import { loadDemoStandards } from "@repo/services/standards/seed/load";
 import { StandardsService } from "@repo/services/standards";
 
@@ -23,9 +25,23 @@ import { runHarvest } from "./harvest";
  * The live HTTP behaviour is covered by the manual verification step in the PR.
  */
 
-/** Synthetic id band for this test's rows — clear of real BIS ids and the demo band. */
+/** Synthetic BIS ids for this test's rows — below the demo band, cleared around each run. */
 const TEST_ID_MIN = 8_100_000;
 const TEST_ID_MAX = 8_200_000;
+/** Stands in for a real harvested row in the demo top-up test. */
+const HARVESTED_IS_456_ID = 8_050_000;
+
+/** Everything a full harvest would write lives below the reserved demo id band. */
+const harvestedRows = lt(standardsTable.bisStandardId, DEMO_BIS_ID_MIN);
+
+async function resetToDemoSlice() {
+  await db.delete(standardsTable).where(harvestedRows);
+  await db.delete(harvestRunsTable);
+  await loadDemoStandards();
+  // Give the demo rows vectors so a later `embedCatalogue` only touches what the
+  // harvest itself added.
+  await embedDemoStandards(fakeEmbeddingProvider);
+}
 
 const FAKE_CATALOGUE: BisListItem[] = [
   item(8_100_001, "IS 99801:2021", "Reinforced concrete water tanks — Code of practice", "Code of Practice"),
@@ -66,34 +82,14 @@ function fakeClient(items: BisListItem[]): CatalogueSource {
   };
 }
 
-const testStartedAt = new Date();
-
 beforeAll(async () => {
   await runMigrations();
-  await db
-    .delete(standardsTable)
-    .where(
-      and(
-        gte(standardsTable.bisStandardId, TEST_ID_MIN),
-        lt(standardsTable.bisStandardId, TEST_ID_MAX),
-      ),
-    );
+  // Start from the demo slice alone — drop any real catalogue a local `pnpm
+  // harvest` left behind so the row-count assertions are exact.
+  await resetToDemoSlice();
 });
 
-afterAll(async () => {
-  await db
-    .delete(standardsTable)
-    .where(
-      and(
-        gte(standardsTable.bisStandardId, TEST_ID_MIN),
-        lt(standardsTable.bisStandardId, TEST_ID_MAX),
-      ),
-    );
-  await db.delete(harvestRunsTable).where(gte(harvestRunsTable.startedAt, testStartedAt));
-  // Undo the top-up test's fake harvested row and restore the demo-band seed.
-  await db.delete(standardsTable).where(eq(standardsTable.bisStandardId, 8_050_000));
-  await loadDemoStandards();
-});
+afterAll(resetToDemoSlice);
 
 describe("full-catalogue harvest", () => {
   it("upserts every parseable catalogue row and skips the rest", async () => {
@@ -199,7 +195,7 @@ describe("demo seed top-up onto a harvested row", () => {
     await db
       .insert(standardsTable)
       .values({
-        bisStandardId: 8_050_000,
+        bisStandardId: HARVESTED_IS_456_ID,
         number: "IS 456:2000",
         numberNormalized: "is:456",
         series: "IS",
@@ -208,7 +204,12 @@ describe("demo seed top-up onto a harvested row", () => {
       .onConflictDoNothing();
     await db
       .delete(standardsTable)
-      .where(and(gte(standardsTable.bisStandardId, 9_000_000), eq(standardsTable.numberNormalized, "is:456")));
+      .where(
+        and(
+          gte(standardsTable.bisStandardId, DEMO_BIS_ID_MIN),
+          eq(standardsTable.numberNormalized, "is:456"),
+        ),
+      );
 
     const result = await loadDemoStandards();
     expect(result.toppedUp).toBeGreaterThan(0);
@@ -218,8 +219,10 @@ describe("demo seed top-up onto a harvested row", () => {
       .from(standardsTable)
       .where(eq(standardsTable.numberNormalized, "is:456"));
     expect(rows).toHaveLength(1);
-    expect(rows[0]?.bisStandardId).toBe(8_050_000);
+    expect(rows[0]?.bisStandardId).toBe(HARVESTED_IS_456_ID);
     expect(rows[0]?.summary?.toLowerCase()).toContain("concrete");
     expect(rows[0]?.isStatus).toBe(2);
+    // BIS stays authoritative for the title-level fields the harvest owns.
+    expect(rows[0]?.title).toBe("Plain and Reinforced Concrete — Code of Practice");
   });
 });

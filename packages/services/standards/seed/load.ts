@@ -68,29 +68,15 @@ export interface LoadResult {
   toppedUp: number;
 }
 
-/** The reviewed detail fields a top-up writes onto a harvested row. */
-function detailFields(row: InsertStandard) {
-  return {
-    series: row.series,
-    editionYear: row.editionYear,
-    typeOfStandard: row.typeOfStandard,
-    groupName: row.groupName,
-    isStatus: row.isStatus,
-    supersededByRaw: row.supersededByRaw ?? null,
-    summary: row.summary,
-    // summary / number / title feed the embedding — drop it so the backfill
-    // recomputes the vector from the enriched text.
-    embedding: sql`null`,
-    updatedAt: new Date(),
-  };
-}
-
 /**
  * Reconcile the demo slice to exactly what the data file declares, in one
  * transaction:
  *
- *   1. For each reviewed row, enrich a matching harvested catalogue row (same
- *      normalised designation, outside the demo id band) with the detail fields.
+ *   1. For each reviewed row, enrich ONE matching harvested catalogue row (same
+ *      normalised designation, outside the demo id band) with the reviewed
+ *      fields the title-level harvest cannot supply — `summary`, lifecycle
+ *      `isStatus`, `supersededByRaw`. BIS stays authoritative for the
+ *      designation, title, series, type and edition year.
  *   2. Delete demo-band rows that are no longer listed, or whose designation is
  *      now covered by a harvested row (so the standard is not searchable twice).
  *   3. Insert / refresh the demo-band rows for designations not yet harvested.
@@ -103,19 +89,40 @@ export async function loadDemoStandards(): Promise<LoadResult> {
     let toppedUp = 0;
 
     for (const row of rows) {
-      const enriched = await tx
-        .update(standardsTable)
-        .set(detailFields(row))
+      // A normalised key can match several harvested rows (multiple editions,
+      // English + Hindi entries). Enrich exactly one: an exact designation match
+      // first, otherwise the newest edition.
+      const [target] = await tx
+        .select({ id: standardsTable.id })
+        .from(standardsTable)
         .where(
           and(
             eq(standardsTable.numberNormalized, row.numberNormalized),
             lt(standardsTable.bisStandardId, DEMO_BIS_ID_MIN),
           ),
         )
-        .returning({ id: standardsTable.id });
+        .orderBy(
+          sql`(${standardsTable.number} = ${row.number}) desc`,
+          sql`${standardsTable.editionYear} desc nulls last`,
+        )
+        .limit(1);
 
-      if (enriched.length > 0) toppedUp += enriched.length;
-      else seedRows.push(row);
+      if (target) {
+        await tx
+          .update(standardsTable)
+          .set({
+            isStatus: row.isStatus,
+            supersededByRaw: row.supersededByRaw ?? null,
+            summary: row.summary,
+            // `summary` feeds the embedding — drop it so the backfill recomputes.
+            embedding: sql`null`,
+            updatedAt: new Date(),
+          })
+          .where(eq(standardsTable.id, target.id));
+        toppedUp += 1;
+      } else {
+        seedRows.push(row);
+      }
     }
 
     const keepBandIds = seedRows.map((row) => row.bisStandardId);

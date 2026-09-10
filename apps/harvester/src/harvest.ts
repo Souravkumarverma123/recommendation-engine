@@ -56,6 +56,9 @@ export async function runHarvest(options: RunHarvestOptions): Promise<RunHarvest
     `catalogue harvest: ${catalogue.upserted} upserted, ${catalogue.skipped} skipped ` +
       `(of ${catalogue.fetched} fetched)`,
   );
+  if (catalogue.skippedSamples.length > 0) {
+    log.warn(`unparseable designations (sample): ${catalogue.skippedSamples.join(" | ")}`);
+  }
 
   const provider =
     options.embeddings === undefined ? defaultEmbeddingProvider() : options.embeddings;
