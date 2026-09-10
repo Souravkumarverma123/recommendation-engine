@@ -5,7 +5,9 @@
  * Phase-0 schema — iterate freely. Authoritative facts live here; the LLM never
  * writes to these tables.
  */
+import { sql } from "drizzle-orm";
 import {
+  customType,
   pgTable,
   uuid,
   integer,
@@ -16,11 +18,22 @@ import {
   jsonb,
   vector,
   index,
+  unique,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-/** Cohere embed v4 — Matryoshka; 1024 is a good speed/quality default. */
-export const EMBEDDING_DIM = 1024;
+/**
+ * OpenAI `text-embedding-3-small` — fixed 1536 dims. Frozen day-1 contract
+ * (docs/PRD.md §Database); ingestion and retrieval must agree on this exact value.
+ */
+export const EMBEDDING_DIM = 1536;
+
+/** Postgres full-text search vector — not a built-in Drizzle column type. */
+const tsvector = customType<{ data: string }>({
+  dataType() {
+    return "tsvector";
+  },
+});
 
 export const standardsTable = pgTable(
   "standards",
@@ -74,6 +87,15 @@ export const standardsTable = pgTable(
     embedding: vector("embedding", { dimensions: EMBEDDING_DIM }),
     summary: text("summary"), // team-written / paraphrased scope — NEVER copied clause text
 
+    /**
+     * Lexical-search vector, maintained by Postgres. Designation weighted highest
+     * ('A'), then title ('B'), then the team-written summary ('C'). Queried with
+     * `ts_rank_cd` and fused with the pgvector results via RRF (docs/PRD.md §Pipeline).
+     */
+    searchVector: tsvector("search_vector").generatedAlwaysAs(
+      sql`setweight(to_tsvector('simple', coalesce("number", '')), 'A') || setweight(to_tsvector('english', coalesce(title, '')), 'B') || setweight(to_tsvector('english', coalesce(summary, '')), 'C')`,
+    ),
+
     // Provenance
     raw: jsonb("raw"), // full detail payload for anything not modelled above
     scrapedAt: timestamp("scraped_at").defaultNow(),
@@ -90,6 +112,7 @@ export const standardsTable = pgTable(
       "hnsw",
       t.embedding.op("vector_cosine_ops"),
     ),
+    index("standards_search_vector_idx").using("gin", t.searchVector),
   ],
 );
 
@@ -112,7 +135,11 @@ export const amendmentsTable = pgTable(
     scrapedAt: timestamp("scraped_at").defaultNow(),
   },
   (t) => [
-    uniqueIndex("amendments_standard_no_uq").on(t.standardId, t.amendmentNo, t.year),
+    // `year` is nullable (the BIS payload sometimes omits it). NULLS NOT DISTINCT
+    // so a re-harvest can't insert a duplicate (std, amendment_no, NULL) row.
+    unique("amendments_standard_no_uq")
+      .on(t.standardId, t.amendmentNo, t.year)
+      .nullsNotDistinct(),
   ],
 );
 

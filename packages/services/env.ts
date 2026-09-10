@@ -1,9 +1,9 @@
 import { z } from "zod";
 
 const envSchema = z.object({
-  // LLM + embeddings
-  ANTHROPIC_API_KEY: z.string().optional(),
-  COHERE_API_KEY: z.string().optional(),
+  // LLM + embeddings — OpenAI only (gpt-5-mini + text-embedding-3-small).
+  // Frozen day-1 contract (docs/PRD.md §Database).
+  OPENAI_API_KEY: z.string().optional(),
 
   // BIS source API (public, no auth)
   BIS_API_BASE: z.string().default("https://standardsadmin.bis.gov.in"),
