@@ -1,0 +1,19 @@
+/**
+ * `pnpm db:seed` entrypoint — loads the hand-seeded demo catalogue into
+ * `standards`. Thin wrapper around `loadDemoStandards()` so the logic stays
+ * importable and testable.
+ */
+import { loadDemoStandards } from "./load";
+
+loadDemoStandards()
+  .then(({ upserted, pruned }) => {
+    console.info(
+      `✅ demo catalogue loaded — ${upserted} upserted, ${pruned} stale row(s) pruned`,
+    );
+    process.exit(0);
+  })
+  .catch((err: unknown) => {
+    console.error("❌ demo catalogue load failed");
+    console.error(err);
+    process.exit(1);
+  });

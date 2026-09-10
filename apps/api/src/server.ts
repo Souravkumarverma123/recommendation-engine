@@ -18,9 +18,12 @@ const openApiDocument = generateOpenApiDocument(serverRouter, {
 });
 
 if (env.NODE_ENV !== "prod") {
+  // Reflect the caller's origin and allow credentials — the tRPC client sends
+  // `credentials: "include"`, which browsers reject against a wildcard origin.
   app.use(
     cors({
-      origin: "*",
+      origin: true,
+      credentials: true,
     }),
   );
 }
