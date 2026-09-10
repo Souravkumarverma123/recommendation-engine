@@ -1,11 +1,17 @@
 {
   "name": "@repo/logger",
   "version": "1.0.0",
-  "scripts": {},
+  "scripts": {
+    "lint": "eslint .",
+    "check-types": "tsc --noEmit",
+    "test": "vitest run"
+  },
   "devDependencies": {
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
-    "typescript": "^5.9.3"
+    "@repo/vitest-config": "workspace:*",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
   },
   "dependencies": {
     "winston": "^3.19.0",

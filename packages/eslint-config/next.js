@@ -52,6 +52,17 @@ export const nextJsConfig = [
       ...pluginReactHooks.configs.recommended.rules,
       // React scope no longer necessary with new JSX transform.
       "react/react-in-jsx-scope": "off",
+      // TypeScript already checks prop types; the plugin's runtime check is noise.
+      "react/prop-types": "off",
+    },
+  },
+  {
+    // Node-context config files at the app root (e.g. env.js, next.config.js).
+    files: ["*.js", "*.mjs", "*.cjs"],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
     },
   },
 ];
