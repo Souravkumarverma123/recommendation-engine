@@ -9,10 +9,15 @@
  * repo root). The `standards.search` seam test also calls `loadDemoStandards()`
  * directly from its global setup.
  */
-import { db, sql } from "@repo/database";
+import { and, db, gte, lt, notInArray, sql } from "@repo/database";
 import { standardsTable, type InsertStandard } from "@repo/database/schema";
 import { parseDesignation } from "../../bis/designation";
-import { DEMO_STANDARDS, type DemoStandard } from "./demo-standards.data";
+import {
+  DEMO_BIS_ID_MAX,
+  DEMO_BIS_ID_MIN,
+  DEMO_STANDARDS,
+  type DemoStandard,
+} from "./demo-standards.data";
 
 /** Shape one reviewed demo row into a `standards` insert. */
 export function toInsertStandard(row: DemoStandard): InsertStandard {
@@ -41,35 +46,52 @@ export function buildDemoRows(): InsertStandard[] {
 }
 
 export interface LoadResult {
-  inserted: number;
+  upserted: number;
+  pruned: number;
 }
 
 /**
- * Upsert every demo standard. On conflict (same `bisStandardId`) the mutable
- * catalogue fields are refreshed so an edited data file takes effect on re-run.
+ * Reconcile the demo slice to exactly what the data file declares. In one
+ * transaction: delete any row in the reserved demo id band that is no longer
+ * listed (so a dropped standard stops being searchable on re-run), then upsert
+ * the current set — refreshing the mutable catalogue fields on conflict.
  */
 export async function loadDemoStandards(): Promise<LoadResult> {
   const rows = buildDemoRows();
+  const keepIds = rows.map((row) => row.bisStandardId);
 
-  await db
-    .insert(standardsTable)
-    .values(rows)
-    .onConflictDoUpdate({
-      target: standardsTable.bisStandardId,
-      set: {
-        number: sql`excluded.number`,
-        numberNormalized: sql`excluded.number_normalized`,
-        series: sql`excluded.series`,
-        editionYear: sql`excluded.edition_year`,
-        title: sql`excluded.title`,
-        typeOfStandard: sql`excluded.type_of_standard`,
-        groupName: sql`excluded.group_name`,
-        isStatus: sql`excluded.is_status`,
-        supersededByRaw: sql`excluded.superseded_by_raw`,
-        summary: sql`excluded.summary`,
-        updatedAt: new Date(),
-      },
-    });
+  return db.transaction(async (tx) => {
+    const pruned = await tx
+      .delete(standardsTable)
+      .where(
+        and(
+          gte(standardsTable.bisStandardId, DEMO_BIS_ID_MIN),
+          lt(standardsTable.bisStandardId, DEMO_BIS_ID_MAX),
+          notInArray(standardsTable.bisStandardId, keepIds),
+        ),
+      )
+      .returning({ id: standardsTable.id });
 
-  return { inserted: rows.length };
+    await tx
+      .insert(standardsTable)
+      .values(rows)
+      .onConflictDoUpdate({
+        target: standardsTable.bisStandardId,
+        set: {
+          number: sql`excluded.number`,
+          numberNormalized: sql`excluded.number_normalized`,
+          series: sql`excluded.series`,
+          editionYear: sql`excluded.edition_year`,
+          title: sql`excluded.title`,
+          typeOfStandard: sql`excluded.type_of_standard`,
+          groupName: sql`excluded.group_name`,
+          isStatus: sql`excluded.is_status`,
+          supersededByRaw: sql`excluded.superseded_by_raw`,
+          summary: sql`excluded.summary`,
+          updatedAt: new Date(),
+        },
+      });
+
+    return { upserted: rows.length, pruned: pruned.length };
+  });
 }

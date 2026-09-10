@@ -6,8 +6,10 @@
 import { loadDemoStandards } from "./load";
 
 loadDemoStandards()
-  .then(({ inserted }) => {
-    console.info(`✅ demo catalogue loaded — ${inserted} standards upserted`);
+  .then(({ upserted, pruned }) => {
+    console.info(
+      `✅ demo catalogue loaded — ${upserted} upserted, ${pruned} stale row(s) pruned`,
+    );
     process.exit(0);
   })
   .catch((err: unknown) => {

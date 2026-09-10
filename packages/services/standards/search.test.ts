@@ -1,7 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
+import { prepareDemoDatabase } from "../test/prepare-db";
 import { StandardsService } from "./index";
 import { standardSearchHitSchema } from "./model";
+
+beforeAll(prepareDemoDatabase);
 
 /**
  * Seam — `standards.search` (integration, PRD §Testing Decisions / ticket #6).

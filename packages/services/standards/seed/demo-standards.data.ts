@@ -10,10 +10,19 @@
  * writes these. `summary` is a team-written paraphrase of scope — NEVER copied
  * clause text (BIS Act 2016 s.11).
  *
- * `bisStandardId` values here are placeholders in a private 9_000_00x range;
- * the full-catalogue harvest (ticket #7) replaces them with the real BIS
- * `standardId` and tops up the detail fields.
+ * `bisStandardId` values here are placeholders in the reserved
+ * `DEMO_BIS_ID_MIN`..`DEMO_BIS_ID_MAX` band; the full-catalogue harvest
+ * (ticket #7) replaces them with the real BIS `standardId` and tops up the
+ * detail fields.
  */
+
+/**
+ * Reserved `bisStandardId` band for hand-seeded demo rows. Kept clear of real
+ * BIS ids so the loader can prune demo rows dropped from this file without
+ * touching harvested catalogue records (ticket #7).
+ */
+export const DEMO_BIS_ID_MIN = 9_000_000;
+export const DEMO_BIS_ID_MAX = 10_000_000;
 
 export type DemoDomain =
   | "cement/concrete"
