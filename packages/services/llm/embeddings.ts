@@ -87,7 +87,9 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
  *
  * Returns `null` under Vitest unconditionally: seam tests must inject the
  * deterministic fake embedder, and a forgotten injection should degrade to
- * lexical-only, never reach for the network and real spend.
+ * lexical-only, never reach for the network and real spend. `VITEST` is a
+ * runner marker, not app config, so it is read straight from `process.env`
+ * rather than through the `env` module.
  */
 export function defaultEmbeddingProvider(): EmbeddingProvider | null {
   if (process.env.VITEST) return null;

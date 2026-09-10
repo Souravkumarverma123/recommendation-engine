@@ -10,8 +10,14 @@ import { z } from "zod";
  */
 
 export const standardsSearchInputSchema = z.object({
-  /** Plain-language description of what is being procured, or a designation. */
-  query: z.string().trim().min(1).max(2000),
+  /**
+   * Plain-language description of what is being procured, or a designation.
+   * Bound matches `recommend.run`'s `specText` so a multi-paragraph tender
+   * clause passed straight through does not fail validation here. FTS and
+   * `text-embedding-3-small` (8k-token limit) both handle text this long;
+   * distilling the query to its salient terms is a later pipeline step.
+   */
+  query: z.string().trim().min(1).max(8000),
   /** How many ranked matches to return. The pipeline works on ~15 candidates. */
   limit: z.number().int().min(1).max(50).optional().default(15),
 });

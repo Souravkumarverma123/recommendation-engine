@@ -65,4 +65,11 @@ describe("standards.search — hybrid semantic + lexical retrieval", () => {
     const results = await numbersFor(lexicalOnly, "reinforced concrete");
     expect(results).toContain("IS 456:2000");
   });
+
+  it("lexical-only recovers a match when one noise token breaks the strict query", async () => {
+    // "500" matches no standard; the strict AND query returns nothing, the OR
+    // fallback still finds the chair standard. No embeddings involved.
+    const results = await numbersFor(lexicalOnly, "500 ergonomic office chairs");
+    expect(results).toContain("IS 17631:2022");
+  });
 });
