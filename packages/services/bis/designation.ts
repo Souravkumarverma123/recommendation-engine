@@ -38,7 +38,7 @@ export interface Designation {
  * "IS / IEC". Matched against the trimmed value, so `^` means "the string
  * starts with a series token".
  */
-const SERIES_RE = /^(IS\s*\/\s*ISO\s*\/\s*IEC|IS\s*\/\s*ISO|IS\s*\/\s*IEC|IS|SP)\b/i;
+const SERIES_RE = /^(IS\s*\/\s*ISO\s*\/\s*IEC|IS\s*\/\s*ISO|IS\s*\/\s*IEC|IS|SP)(?![A-Za-z])/i;
 /** "Part 5", "PART-1", "Parts 5" — captures the number. */
 const PART_RE = /\bparts?[\s-]*([0-9]+)/i;
 /** "Sec 1", "Section 1", "Sections 1" — captures the number. */
@@ -78,8 +78,15 @@ export function parseDesignation(raw: string): Designation | null {
   const seriesMatch = s.match(SERIES_RE);
   const series = (seriesMatch?.[1] ?? "IS").replace(/\s+/g, "").toUpperCase();
 
+  // With no recognised series, a bare number leading the string is taken as IS
+  // ("10322 (Part 5/Sec 1)", "456 : 2000"). An alien alpha prefix must not be
+  // coerced: "BS 123" / "EN 10025" are other bodies' standards, not is:123.
+  if (!seriesMatch && /[A-Za-z]/.test(s.split(/\d/, 1)[0] ?? "")) return null;
+
   const part = toInt(s.match(PART_RE)?.[1]);
-  const section = toInt(s.match(SECTION_RE)?.[1]);
+  // A section with no part is meaningless in the IS scheme; drop it so `key` and
+  // `canonical` can't disagree about whether the section is present.
+  const section = part != null ? toInt(s.match(SECTION_RE)?.[1]) : null;
 
   // Hunt for the standard number in the string with the series prefix and every
   // part/section grouping removed, so "10322 (Part 5/Sec 1)" surfaces 10322 and

@@ -215,6 +215,19 @@ describe("parseDesignation — series branch coverage", () => {
   it("tolerates spacing around the slash in a compound series", () => {
     expect(parseDesignation("IS / IEC 60947 : 2024")?.series).toBe("IS/IEC");
   });
+
+  it("matches a series glued to its number", () => {
+    expect(parseDesignation("IS456:2000")?.key).toBe("is:456");
+    expect(parseDesignation("SP6")?.key).toBe("sp:6");
+  });
+
+  it("does not coerce another body's standard into IS", () => {
+    // An alien alpha prefix before the number => not an Indian Standard.
+    expect(parseDesignation("BS 123")).toBeNull();
+    expect(parseDesignation("EN 10025 : 2004")).toBeNull();
+    expect(parseDesignation("ASTM A615")).toBeNull();
+    expect(parseDesignation("conforming to 456:2000")).toBeNull();
+  });
 });
 
 describe("parseDesignation — part / section branch coverage", () => {
@@ -240,6 +253,14 @@ describe("parseDesignation — part / section branch coverage", () => {
     const parsed = parseDesignation("IS 456:2000");
     expect(parsed?.part).toBeNull();
     expect(parsed?.section).toBeNull();
+  });
+
+  it("ignores a section with no part so key and canonical agree", () => {
+    const parsed = parseDesignation("IS 516 : Sec 1 : 2018");
+    expect(parsed?.part).toBeNull();
+    expect(parsed?.section).toBeNull();
+    expect(parsed?.key).toBe("is:516");
+    expect(parsed?.canonical).toBe("IS 516 : 2018");
   });
 });
 
