@@ -7,6 +7,8 @@
  * seam tests inject a deterministic fake (packages/services/test/fake-embeddings.ts)
  * so there is no network, no spend and no flakiness (docs/PRD.md §Testing Decisions).
  */
+import { z } from "zod";
+
 import { EMBEDDING_DIM } from "@repo/database/schema";
 import { env } from "../env";
 
@@ -22,9 +24,21 @@ export interface EmbeddingProvider {
   embed(texts: string[]): Promise<number[][]>;
 }
 
-interface OpenAIEmbeddingResponse {
-  data: Array<{ index: number; embedding: number[] }>;
-}
+/**
+ * Only the fields we use, validated — the endpoint is external and its shape is
+ * not ours to trust. `embedding` is pinned to `EMBEDDING_DIM` so a truncated or
+ * wrong-model vector fails here, not later against `vector(1536)` in Postgres.
+ */
+const openAIEmbeddingResponseSchema = z.object({
+  data: z
+    .array(
+      z.object({
+        index: z.number().int(),
+        embedding: z.array(z.number()).length(EMBEDDING_DIM),
+      }),
+    )
+    .min(1),
+});
 
 /** Calls the OpenAI REST embeddings endpoint directly — no SDK dependency. */
 export class OpenAIEmbeddingProvider implements EmbeddingProvider {
@@ -52,7 +66,13 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
       throw new Error(`OpenAI embeddings request failed (${res.status}): ${detail}`);
     }
 
-    const body = (await res.json()) as OpenAIEmbeddingResponse;
+    const body = openAIEmbeddingResponseSchema.parse(await res.json());
+    if (body.data.length !== texts.length) {
+      throw new Error(
+        `OpenAI embeddings returned ${body.data.length} vectors for ${texts.length} inputs`,
+      );
+    }
+
     return body.data
       .slice()
       .sort((a, b) => a.index - b.index)

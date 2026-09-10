@@ -1,6 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { fakeEmbeddingProvider } from "../test/fake-embeddings";
 import { prepareDemoDatabase } from "../test/prepare-db";
 import { StandardsService } from "./index";
 import { standardSearchHitSchema } from "./model";
@@ -8,16 +7,18 @@ import { standardSearchHitSchema } from "./model";
 beforeAll(prepareDemoDatabase);
 
 /**
- * Seam — `standards.search` (integration, PRD §Testing Decisions / ticket #6).
+ * Seam — `standards.search`, lexical half (integration, PRD §Testing Decisions
+ * / ticket #6).
  *
  * Runs against a real Postgres seeded with the hand-reviewed demo catalogue
- * (test/global-setup.ts). Assertions are on observable output — which
- * designations come back, in what order, with what lifecycle status — never on
- * the SQL, the ranking function, or how retrieval is wired internally. This is
- * the template for the hybrid-search and pipeline seams that build on it.
+ * (test/prepare-db.ts). Embeddings are disabled here so this stays the
+ * pure-lexical regression guard — the previous slice must keep working
+ * unchanged. The semantic half + RRF fusion is covered by hybrid-search.test.ts.
+ * Assertions are on observable output — which designations come back, in what
+ * order, with what lifecycle status — never on the SQL or the ranking function.
  */
 
-const service = new StandardsService({ embeddings: fakeEmbeddingProvider });
+const service = new StandardsService({ embeddings: null });
 
 function numbersFor(query: string, limit?: number) {
   return service

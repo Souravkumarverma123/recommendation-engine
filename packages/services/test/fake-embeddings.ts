@@ -187,7 +187,10 @@ function conceptWeights(text: string): Map<number, number> {
         if (dim == null) continue;
         weights.set(dim, (weights.get(dim) ?? 0) + 1);
       }
-      break; // longest phrase starting at i wins; move past it
+      // Longest phrase starting at i wins; skip the tokens it consumed so an
+      // inner word ("concrete" inside "reinforced concrete") isn't recounted.
+      i += len - 1;
+      break;
     }
   }
   return weights;

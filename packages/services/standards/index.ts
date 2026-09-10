@@ -31,6 +31,25 @@ interface RankedRow extends Record<string, unknown> {
  */
 const RRF_K = 60;
 
+/**
+ * How long `search()` waits for the semantic list before returning lexical
+ * results alone. A slow or hung embedding call must not hold up results that
+ * are already in hand.
+ */
+const SEMANTIC_BUDGET_MS = 2500;
+
+/** Resolve to `promise`, or to `fallback` if it rejects or outruns `ms`. */
+function withinBudget<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(fallback), ms);
+    const settle = (value: T) => {
+      clearTimeout(timer);
+      resolve(value);
+    };
+    promise.then(settle, () => settle(fallback));
+  });
+}
+
 export interface StandardsServiceOptions {
   /**
    * Embedding provider for the semantic list. Defaults to the OpenAI provider
@@ -53,15 +72,18 @@ export class StandardsService {
    * Input is re-validated here so the method is safe to call outside tRPC.
    *
    * Runs the lexical and semantic lists concurrently and fuses them with RRF.
-   * If the embedding call fails the search degrades to lexical-only rather than
-   * erroring — retrieval staying up matters more than the semantic half.
+   * The semantic half is bounded by `SEMANTIC_BUDGET_MS` and swallows its own
+   * errors, so a slow, hung or failing embedding call degrades the response to
+   * lexical-only rather than blocking or erroring — results in hand matter more
+   * than the semantic half.
    */
   async search(input: StandardsSearchInput): Promise<StandardsSearchOutput> {
     const { query, limit } = standardsSearchInputSchema.parse(input);
 
+    const empty: StandardSearchHit[] = [];
     const [lexical, semantic] = await Promise.all([
       this.lexicalSearch(query, limit),
-      this.semanticSearch(query, limit).catch(() => [] as StandardSearchHit[]),
+      withinBudget(this.semanticSearch(query, limit), SEMANTIC_BUDGET_MS, empty),
     ]);
 
     const results = fuseByRrf([lexical, semantic], limit);

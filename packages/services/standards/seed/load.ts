@@ -88,6 +88,10 @@ export async function loadDemoStandards(): Promise<LoadResult> {
           isStatus: sql`excluded.is_status`,
           supersededByRaw: sql`excluded.superseded_by_raw`,
           summary: sql`excluded.summary`,
+          // The embedding is derived from number + title + summary. Any of those
+          // may have just changed, so drop it — `embedDemoStandards` refills it
+          // when a key is available; without one, a null beats a stale vector.
+          embedding: sql`null`,
           updatedAt: new Date(),
         },
       });

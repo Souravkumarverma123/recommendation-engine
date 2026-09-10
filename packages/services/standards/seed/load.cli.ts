@@ -19,7 +19,8 @@ async function main() {
   const provider = defaultEmbeddingProvider();
   if (!provider) {
     console.warn(
-      "⚠️  OPENAI_API_KEY not set — skipped embeddings; semantic search will be empty",
+      "⚠️  OPENAI_API_KEY not set — embeddings cleared (not stale); semantic " +
+        "search is disabled until you reseed with a key",
     );
     return;
   }
