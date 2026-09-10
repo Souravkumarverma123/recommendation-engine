@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { fakeEmbeddingProvider } from "../test/fake-embeddings";
 import { prepareDemoDatabase } from "../test/prepare-db";
 import { QcoService } from "../qco";
+import { regulatoryStatusSchema } from "../qco/model";
 import { StandardsService } from "../standards";
 import { RecommendService } from "./index";
 
@@ -60,9 +61,7 @@ describe("recommend.run — ranked standards with an independent regulatory badg
     const output = await recommend.run({ specText: "portland cement for concrete" });
     expect(output.results.length).toBeGreaterThan(0);
     for (const result of output.results) {
-      expect(["MANDATORY", "UPCOMING", "VOLUNTARY", "NEEDS_REVIEW"]).toContain(
-        result.regulatoryStatus,
-      );
+      expect(regulatoryStatusSchema.options).toContain(result.regulatoryStatus);
     }
     // IS 269 is mandatory; IS 456 (a code of practice) is voluntary — both surface
     // for this query and must not get the same badge just because both matched.

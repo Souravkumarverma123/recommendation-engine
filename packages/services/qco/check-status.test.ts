@@ -54,9 +54,12 @@ describe("qco.checkStatus — independent regulatory check", () => {
     expect(result.qco).toBeNull();
   });
 
-  it("does not carry the cement QCO onto the superseded IS 8112", async () => {
-    // The obligation moved to IS 269:2015 when the OPC grades were consolidated;
-    // a naive string match would still call IS 8112 mandatory.
+  it("KNOWN GAP: a superseded designation reads VOLUNTARY until version resolution lands", async () => {
+    // IS 8112 is itself under no QCO — the obligation moved to IS 269:2015 when
+    // the OPC grades were consolidated. So "cement conforming to IS 8112" is a
+    // false-negative today (PRD user story 12). Fixing it needs the supersession
+    // graph (PRD §Pipeline step 7); this test characterises the current
+    // behaviour so that change is a deliberate, visible one.
     const result = await qco.checkStatus({ isNumber: "IS 8112:2013" });
     expect(result.status).toBe("VOLUNTARY");
   });

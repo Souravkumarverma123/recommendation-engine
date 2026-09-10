@@ -9,21 +9,22 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 
-const LIFECYCLE_LABEL: Record<string, string> = {
-  ACTIVE: "Active",
-  WITHDRAWN: "Withdrawn",
-  UNKNOWN: "Status unknown",
+type Recommendation = RouterOutputs["recommend"]["run"]["results"][number];
+
+type BadgeVariant = "default" | "secondary" | "destructive" | "outline";
+
+const LIFECYCLE: Record<
+  Recommendation["lifecycleStatus"],
+  { label: string; variant: BadgeVariant }
+> = {
+  ACTIVE: { label: "Active", variant: "secondary" },
+  WITHDRAWN: { label: "Withdrawn", variant: "destructive" },
+  UNKNOWN: { label: "Status unknown", variant: "outline" },
 };
 
-function LifecycleBadge({ status }: { status: string }) {
-  const variant =
-    status === "ACTIVE" ? "secondary" : status === "WITHDRAWN" ? "destructive" : "outline";
-  return <Badge variant={variant}>{LIFECYCLE_LABEL[status] ?? status}</Badge>;
-}
-
 const REGULATORY: Record<
-  string,
-  { label: string; variant: "default" | "secondary" | "destructive" | "outline" }
+  Recommendation["regulatoryStatus"],
+  { label: string; variant: BadgeVariant }
 > = {
   MANDATORY: { label: "Mandatory · QCO", variant: "destructive" },
   UPCOMING: { label: "Upcoming QCO", variant: "default" },
@@ -31,9 +32,8 @@ const REGULATORY: Record<
   NEEDS_REVIEW: { label: "Needs review", variant: "outline" },
 };
 
-function RegulatoryBadge({ status }: { status: string }) {
-  const meta = REGULATORY[status] ?? { label: status, variant: "outline" as const };
-  return <Badge variant={meta.variant}>{meta.label}</Badge>;
+function StatusBadge({ label, variant }: { label: string; variant: BadgeVariant }) {
+  return <Badge variant={variant}>{label}</Badge>;
 }
 
 function formatDate(iso: string): string {
@@ -47,9 +47,7 @@ function formatDate(iso: string): string {
   });
 }
 
-type Recommendation = RouterOutputs["recommend"]["run"]["results"][number];
-
-function QcoCitation({ result }: { result: Recommendation }) {
+function QcoCitationLine({ result }: { result: Recommendation }) {
   const { qco, qcoNote } = result;
   if (!qco) return null;
 
@@ -57,6 +55,7 @@ function QcoCitation({ result }: { result: Recommendation }) {
     <p className="text-muted-foreground text-xs">
       {qco.title}
       {qco.soNumbers.length > 0 && <> · {qco.soNumbers[qco.soNumbers.length - 1]}</>}
+      {qco.scheme && <> · Scheme {qco.scheme}</>}
       {qco.enforcementDate && <> · in force from {formatDate(qco.enforcementDate)}</>}
       {qco.sourceUrl && (
         <>
@@ -70,6 +69,9 @@ function QcoCitation({ result }: { result: Recommendation }) {
             source
           </a>
         </>
+      )}
+      {qco.specificRequirement && (
+        <span className="block">{qco.specificRequirement}</span>
       )}
       {qcoNote && <span className="block italic">{qcoNote}</span>}
     </p>
@@ -142,12 +144,12 @@ export function RecommendationSearch() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-mono text-sm font-medium">{result.number}</span>
                 <div className="flex items-center gap-2">
-                  <RegulatoryBadge status={result.regulatoryStatus} />
-                  <LifecycleBadge status={result.lifecycleStatus} />
+                  <StatusBadge {...REGULATORY[result.regulatoryStatus]} />
+                  <StatusBadge {...LIFECYCLE[result.lifecycleStatus]} />
                 </div>
               </div>
               <p className="text-sm">{result.title}</p>
-              <QcoCitation result={result} />
+              <QcoCitationLine result={result} />
             </article>
           ))}
       </section>

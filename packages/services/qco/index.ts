@@ -25,6 +25,7 @@ interface ObligationRow {
   obStatus: string;
   enforcementDate: string | null;
   scheme: string | null;
+  specificRequirement: string | null;
   title: string;
   soNumbers: string[] | null;
   soDates: string[] | null;
@@ -48,6 +49,7 @@ export class QcoService {
           obStatus: qcoObligationsTable.status,
           enforcementDate: qcoObligationsTable.enforcementDate,
           scheme: qcoObligationsTable.scheme,
+          specificRequirement: qcoObligationsTable.specificRequirement,
           title: qcosTable.title,
           soNumbers: qcosTable.soNumbers,
           soDates: qcosTable.soDates,
@@ -73,16 +75,7 @@ export class QcoService {
       if (horizontal) {
         return {
           status: "NEEDS_REVIEW",
-          qco: {
-            title: horizontal.title,
-            soNumbers: horizontal.soNumbers,
-            soDates: [],
-            enforcementDate: null,
-            scheme: null,
-            ministry: horizontal.ministry,
-            sourceUrl: horizontal.sourceUrl,
-            gazettePdfUrl: null,
-          },
+          qco: buildCitation(horizontal),
           note:
             `Product description matches the scope of "${horizontal.title}", ` +
             "a horizontal QCO that confers mandatory status by scope rather " +
@@ -119,7 +112,7 @@ function pickObligation(
     );
 
   const best = ranked[0]!;
-  return { status: best.status, citation: toCitation(best.row) };
+  return { status: best.status, citation: buildCitation(best.row) };
 }
 
 function resolveStatus(row: ObligationRow): "MANDATORY" | "UPCOMING" {
@@ -140,16 +133,32 @@ function compareDates(a: string | null, b: string | null): number {
   return a < b ? -1 : 1;
 }
 
-function toCitation(row: ObligationRow): QcoCitation {
+/**
+ * One mapper for every `QcoCitation`, whether it comes from an obligation row
+ * or a horizontal-QCO predicate — so the two sources cannot drift. Missing
+ * fields (a horizontal QCO has no scheme, dates or PDF) normalise to null / [].
+ */
+function buildCitation(src: {
+  title: string;
+  soNumbers?: string[] | null;
+  soDates?: string[] | null;
+  enforcementDate?: string | null;
+  scheme?: string | null;
+  specificRequirement?: string | null;
+  ministry?: string | null;
+  sourceUrl?: string | null;
+  gazettePdfUrl?: string | null;
+}): QcoCitation {
   return {
-    title: row.title,
-    soNumbers: row.soNumbers ?? [],
-    soDates: row.soDates ?? [],
-    enforcementDate: row.enforcementDate,
-    scheme: row.scheme,
-    ministry: row.ministry,
-    sourceUrl: row.sourceUrl,
-    gazettePdfUrl: row.gazettePdfUrl,
+    title: src.title,
+    soNumbers: src.soNumbers ?? [],
+    soDates: src.soDates ?? [],
+    enforcementDate: src.enforcementDate ?? null,
+    scheme: src.scheme ?? null,
+    specificRequirement: src.specificRequirement ?? null,
+    ministry: src.ministry ?? null,
+    sourceUrl: src.sourceUrl ?? null,
+    gazettePdfUrl: src.gazettePdfUrl ?? null,
   };
 }
 

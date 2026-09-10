@@ -45,6 +45,12 @@ export const qcoCitationSchema = z.object({
   enforcementDate: z.string().nullable(),
   /** Certification scheme (I / II / IV / X); null for horizontal QCOs. */
   scheme: z.string().nullable(),
+  /**
+   * Rating/category condition (Scheme X) or phasing note — e.g. the Furniture
+   * QCO's split large-enterprise / MSME enforcement dates. Free text; null when
+   * the obligation applies unconditionally.
+   */
+  specificRequirement: z.string().nullable(),
   ministry: z.string().nullable(),
   sourceUrl: z.string().nullable(),
   gazettePdfUrl: z.string().nullable(),
