@@ -120,9 +120,9 @@ The system separates **authoritative facts** (standard number, title, edition ye
 ### Database (frozen day 1 — PRD §Contracts)
 
 - **PostgreSQL 16** via the `pgvector/pgvector:pg16` image. `vector` extension enabled on first boot (`scripts/init-db.sql`) and as the first line of the Drizzle migration for hosted Postgres.
-- **Drizzle ORM.** Schema starts from the committed draft models in `packages/database/models` and is corrected during the first data-track PR:
-  - embedding dimension is **1536** (OpenAI `text-embedding-3-small`), not 1024;
-  - environment/config references are **OpenAI**, not Cohere/Anthropic.
+- **Drizzle ORM.** The committed draft models in `packages/database/models` currently encode the *old* stack (1024-dim, Cohere/Anthropic env vars) and are **wrong** against this contract. The contract values below are authoritative; the code changes to match, not the reverse. This correction is a **P0 prerequisite** (`track:data`, the very first schema PR) — no embedding or retrieval work starts until it lands, or ingestion and search will not interoperate:
+  - embedding dimension is **1536** (`EMBEDDING_DIM = 1536`, OpenAI `text-embedding-3-small`); `standards.embedding` is `vector(1536)`;
+  - config/env references are **`OPENAI_API_KEY`** only — the `COHERE_API_KEY` / `ANTHROPIC_API_KEY` entries in the draft `env.ts` are removed.
 - Tables: `standards` (catalogue record + lifecycle fields + `embedding vector(1536)` + team-written `summary`), `amendments`, `standard_edges` (typed relationship graph: `REFERS_TO`, `REFERENCED_BY`, `SUPERSEDED_BY`, `AMALGAMATES`, `PART_OF`, `EQUIVALENT_TO`, `AMENDED_BY`), `committees`, `departments`, `qcos`, `qco_obligations`, `harvest_runs`.
 - `standards` carries a normalised designation key and a `tsvector` (or a generated FTS column) for lexical search; an **HNSW / cosine** index on `embedding`.
 - `standard_edges.dst` may reference a standard not yet ingested — the raw target designation is always stored; the resolved foreign key is filled in by entity resolution when a match exists.
@@ -242,9 +242,9 @@ Build strictly P0 → P1 → P2. A P1 ticket does not start while a P0 ticket is
 - **Rupesh + one of Abhinav/Aditya** — deck + live API demo.
 - **Remaining member** — runner: env setup, seed data, testing, logging failures.
 - Tickets: **GitHub Issues** + Projects board (Backlog / Ready / In progress / In review / Done). Labels: `track:data` `track:app` `track:web` `track:infra` `track:deck`, `P0`–`P3`, `ready-for-agent`.
-- **PR flow from the start** (including tonight): feature branch → PR → **the automated code-review bot** automated review → significant findings resolved or justified → **1 human approval** → merge. `main` protected.
+- **PR flow from the start** (including tonight): feature branch → PR → **CodeAnt AI** automated review → significant findings resolved or justified → **1 human approval** → merge. `main` protected.
 - **Ticket = one PR = ≤ half a day.** Body: *Context → Acceptance criteria → Verify by → Depends on*.
-- **Definition of Done:** tests + typecheck + lint green · the "Verify by" step performed with evidence pasted in the PR · the automated code-review bot review clear · 1 human approval.
+- **Definition of Done:** tests + typecheck + lint green · the "Verify by" step performed with evidence pasted in the PR · CodeAnt AI review clear · 1 human approval.
 - **Blockers to clear before the first feature PR:** (i) the automated review bot must be installed on the repo; (ii) a second approver must be available for 3am PRs (Sourav cannot self-merge on protected `main`) — nominate Shaurya, or grant Sourav admin-bypass for P0 tickets tonight only; (iii) the CI + Vitest setup P0 prerequisite ticket (see Testing Decisions) must land first, or "green CI" in the DoD is not enforceable.
 
 ### Data-source caveat
