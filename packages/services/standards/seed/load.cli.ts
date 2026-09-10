@@ -12,9 +12,11 @@ import { embedDemoStandards } from "./embed";
 import { loadDemoStandards } from "./load";
 
 async function main() {
-  const { upserted, pruned } = await loadDemoStandards();
+  const { upserted, pruned, toppedUp } = await loadDemoStandards();
   console.info(
-    `✅ demo catalogue loaded — ${upserted} upserted, ${pruned} stale row(s) pruned`,
+    `✅ demo catalogue loaded — ${upserted} reviewed row(s): ${toppedUp} topped up on ` +
+      `harvested records, ${upserted - toppedUp} seeded in the demo band, ${pruned} stale ` +
+      `row(s) pruned`,
   );
 
   const provider = defaultEmbeddingProvider();

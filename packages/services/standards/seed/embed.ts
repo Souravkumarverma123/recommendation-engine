@@ -12,6 +12,7 @@
 import { db, inArray, sql } from "@repo/database";
 import { standardsTable } from "@repo/database/schema";
 import type { EmbeddingProvider } from "../../llm/embeddings";
+import { parseDesignation } from "../../bis/designation";
 import { DEMO_STANDARDS } from "./demo-standards.data";
 
 /** The text a standard is embedded from — designation, title, team summary. */
@@ -30,11 +31,17 @@ export interface EmbedResult {
 /**
  * Embed every seeded demo standard and store the vector. Reads the rows back
  * from the DB (not the data file) so it always embeds exactly what was loaded.
+ *
+ * Matched on the normalised designation, not the reserved demo id band, so it
+ * covers both a bare seed (demo-band rows) and a post-harvest top-up (the
+ * reviewed detail fields now living on the real catalogue row — ticket #9).
  */
 export async function embedDemoStandards(
   provider: EmbeddingProvider,
 ): Promise<EmbedResult> {
-  const keepIds = DEMO_STANDARDS.map((s) => s.bisStandardId);
+  const keys = DEMO_STANDARDS.map((s) => parseDesignation(s.number)?.key).filter(
+    (key): key is string => Boolean(key),
+  );
   const rows = await db
     .select({
       id: standardsTable.id,
@@ -43,7 +50,7 @@ export async function embedDemoStandards(
       summary: standardsTable.summary,
     })
     .from(standardsTable)
-    .where(inArray(standardsTable.bisStandardId, keepIds));
+    .where(inArray(standardsTable.numberNormalized, keys));
 
   if (rows.length === 0) return { embedded: 0 };
 
