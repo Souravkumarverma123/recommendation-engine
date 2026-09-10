@@ -27,7 +27,7 @@ No existing tool solves this. The BIS portal lets you *search* standards; it doe
 A web application where a procurement officer pastes a procurement requirement — a product description, a technical specification, or a tender clause, **in English or Hindi** — and receives a ranked list of applicable Indian Standards. For each recommended standard the officer sees:
 
 - the **current edition** (with a note if it supersedes/replaces an older one the officer may have had in mind);
-- a **regulatory badge** — `MANDATORY` / `VOLUNTARY` / `UPCOMING` — and when mandatory or upcoming, the **QCO citation**: order title, S.O. number, and enforcement date;
+- a **regulatory badge** — `MANDATORY` / `UPCOMING` / `VOLUNTARY` / `NEEDS_REVIEW` — and when mandatory or upcoming, the **QCO citation**: order title, S.O. number, and enforcement date (`NEEDS_REVIEW` means the product may fall under a scope-based "horizontal" QCO that cannot be resolved automatically);
 - the **allied standards** it depends on, each tagged by role (normative reference / test method / safety / terminology / installation);
 - an **evidence excerpt** — the phrase(s) in the officer's input that triggered the recommendation, so the choice can be defended in file notes and to audit;
 - **gap warnings** about the officer's draft: a cited standard that has been superseded, a brand name that violates the no-brand rule, a foreign/ISO standard cited where an equivalent Indian Standard exists, non-metric units;
@@ -59,7 +59,7 @@ The system separates **authoritative facts** (standard number, title, edition ye
 
 **Independent regulatory / QCO check**
 
-11. As a procurement officer, I want each recommended standard flagged as MANDATORY, VOLUNTARY, or UPCOMING, so that I know whether to require certification or merely reference the standard.
+11. As a procurement officer, I want each recommended standard flagged as MANDATORY, UPCOMING, VOLUNTARY, or NEEDS_REVIEW, so that I know whether to require certification, merely reference the standard, or check a possible scope-based QCO myself.
 12. As a procurement officer, I want the system to check the QCO layer independently of whether a standard was found, so that a `VOLUNTARY` result means "checked and confirmed not mandatory", not "we didn't look".
 13. As a procurement officer, when a standard is mandatory I want the QCO citation shown — order title, S.O. number, enforcement date — so that I can reference the legal basis in the tender.
 14. As a procurement officer, when a QCO's enforcement date is in the future (or phased), I want that date shown, so that I know from when the requirement bites.
@@ -131,7 +131,7 @@ The system separates **authoritative facts** (standard number, title, edition ye
 
 - `standards.search` — input `{ query: string, limit?: number }` → list of catalogue matches (designation, title, `isStatus`).
 - `standards.get` — input `{ number: string }` → one standard's full record + amendments + edges.
-- `qco.checkStatus` — input `{ isNumber: string }` (and/or a product descriptor) → `{ status: "MANDATORY" | "VOLUNTARY" | "UPCOMING", qco?: { title, soNumbers, enforcementDate, scheme, sourceUrl } }`.
+- `qco.checkStatus` — input `{ isNumber: string }` (and/or a product descriptor) → `{ status: "MANDATORY" | "UPCOMING" | "VOLUNTARY" | "NEEDS_REVIEW", qco?: { title, soNumbers, enforcementDate, scheme, sourceUrl } }`. `NEEDS_REVIEW` is returned when the product matches a horizontal-QCO scope predicate (see pipeline step 6).
 - `recommend.run` — input `{ specText: string, language?: "en" | "hi" }` → the full structured recommendation: ranked applicable standards, each with current-edition info, regulatory badge + QCO citation, allied standards tagged by role, evidence excerpt(s), gap warnings, draft clause; plus per-fact provenance (source dataset + `scrapedAt`).
 - All I/O typed with Zod. The frontend builds against these types (mocked) until the endpoints land.
 
@@ -142,7 +142,7 @@ The system separates **authoritative facts** (standard number, title, edition ye
 3. **Hybrid retrieve:** semantic search over `standards.embedding` (pgvector, cosine) + lexical search over the FTS column (Postgres `tsvector` / `ts_rank_cd`). Fuse the two ranked lists with **Reciprocal Rank Fusion**. Take the top ~15 candidates. **No dedicated reranker.**
 4. **Assemble candidates** with their metadata and (for demo-slice standards) their cross-reference neighbours.
 5. **LLM structured call** (`gpt-5-mini`): given the requirement and the ~15 candidates, produce ranking, per-candidate role classification, the evidence excerpts, the gap warnings, and the draft clause — **constrained so every standard number it emits is one of the supplied candidates**.
-6. **Independent QCO check:** for each standard in the LLM's shortlist, query `qco_obligations` by normalised designation → set `MANDATORY` / `UPCOMING` / `VOLUNTARY` with citation. This overrides anything the LLM said about mandatory status.
+6. **Independent QCO check:** for each standard in the LLM's shortlist, query `qco_obligations` by normalised designation. Separately, test the product/requirement against a small list of **horizontal-QCO scope predicates** (e.g. the Household Appliances QCO 2024, the Machinery Omnibus Technical Regulation 2024) which confer mandatory status by scope, not by IS number. Outcome: `MANDATORY` / `UPCOMING` (IS-number match) with citation, `NEEDS_REVIEW` (scope-predicate match — cannot be auto-resolved), or `VOLUNTARY` (neither). This overrides anything the LLM said about mandatory status. For the MVP the horizontal-QCO predicate list is a hardcoded set; none of the five demo domains trigger it (all have explicit IS-number QCOs).
 7. **Version resolution:** for each shortlisted standard, use `isStatus` / `withdrawStatus` / `superseded_byis` / `validUpto` to attach the current edition, flag supersession, and note concurrent-running pairs.
 8. **Post-hoc verification:** drop or flag any standard number in the output that does not exist in `standards` or does not trace back to a retrieved candidate.
 9. **Response assembly:** compose the structured result with per-fact provenance.
@@ -190,7 +190,7 @@ Store and display: standard numbers, titles, edition years, committees, lifecycl
 
 **Seam 2 — `parseDesignation` (pure unit).** A table of real messy inputs → expected canonical keys / structured fields: `"IS 456:2000"`, `"IS 456 : 2000"`, `"IS 1489 (Part 1) : 1991"`, `"IS 1489 : PART 1 : 1991"`, `"IS 516 (Part-5/Sec-1) : 2018"`, `"10322 (Part 5/Sec 1)"` (no prefix), `"IS/IEC 60947 : Part 5 : Sec 1 : 2024"`, `"IS/ISO 9001 : 2015"`, `"SP 6 : Part 7"`, `"IS 8112"` (no year), plus a couple of unparseable strings that must return null. This is the **template** for all pure-logic tests.
 
-**Runner:** Vitest, per-package config, wired into the Turborepo `test` task. CI (GitHub Actions) runs `test` + `typecheck` + `lint` on every PR.
+**Runner:** Vitest, per-package config, wired into the Turborepo `test` task. **These do not exist yet** — the repo has no test framework, no `test` script, and no GitHub Actions workflow. Creating the Vitest setup + the `test` script in each package + a `.github/workflows/ci.yml` that runs `test` + `typecheck` + `lint` on every PR is a **P0 prerequisite ticket** (`track:infra`), landed before any feature PR. Until then the DoD's "green CI" cannot be enforced by the platform and must be checked by hand.
 
 **Not unit-tested** (covered otherwise): the BIS client's HTTP behaviour (covered by the manual "Verify by" step against the live API in the harvester PRs); RRF fusion and QCO-match logic (exercised through the `recommend.run` seam); the harvester (verified by asserting row counts after a run).
 
@@ -242,10 +242,10 @@ Build strictly P0 → P1 → P2. A P1 ticket does not start while a P0 ticket is
 - **Rupesh + one of Abhinav/Aditya** — deck + live API demo.
 - **Remaining member** — runner: env setup, seed data, testing, logging failures.
 - Tickets: **GitHub Issues** + Projects board (Backlog / Ready / In progress / In review / Done). Labels: `track:data` `track:app` `track:web` `track:infra` `track:deck`, `P0`–`P3`, `ready-for-agent`.
-- **PR flow from the start** (including tonight): feature branch → PR → **CodeRabbit** automated review → significant findings resolved or justified → **1 human approval** → merge. `main` protected.
+- **PR flow from the start** (including tonight): feature branch → PR → **the automated code-review bot** automated review → significant findings resolved or justified → **1 human approval** → merge. `main` protected.
 - **Ticket = one PR = ≤ half a day.** Body: *Context → Acceptance criteria → Verify by → Depends on*.
-- **Definition of Done:** tests + typecheck + lint green · the "Verify by" step performed with evidence pasted in the PR · CodeRabbit review clear · 1 human approval.
-- **Two blockers to clear before the first PR:** (i) CodeRabbit must be installed on the repo; (ii) a second approver must be available for 3am PRs (Sourav cannot self-merge on protected `main`) — nominate Shaurya, or grant Sourav admin-bypass for P0 tickets tonight only.
+- **Definition of Done:** tests + typecheck + lint green · the "Verify by" step performed with evidence pasted in the PR · the automated code-review bot review clear · 1 human approval.
+- **Blockers to clear before the first feature PR:** (i) the automated review bot must be installed on the repo; (ii) a second approver must be available for 3am PRs (Sourav cannot self-merge on protected `main`) — nominate Shaurya, or grant Sourav admin-bypass for P0 tickets tonight only; (iii) the CI + Vitest setup P0 prerequisite ticket (see Testing Decisions) must land first, or "green CI" in the DoD is not enforceable.
 
 ### Data-source caveat
 
