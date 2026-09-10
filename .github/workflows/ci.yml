@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  # Every PR, whatever its base — so stacked PRs (e.g. one based on another
+  # feature branch) also get checked, not just PRs that target main directly.
+  pull_request:
+  # And on pushes to main (post-merge history / branch-protection status).
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: test · check-types · lint
+    runs-on: ubuntu-latest
+
+    services:
+      # pgvector-enabled Postgres 16 — matches docker-compose.yml. Not used by any
+      # suite yet; the `recommend.run` integration seam (ticket #8) will seed and query it.
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d dev"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dev
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Enable pgvector extension
+        run: PGPASSWORD=postgres psql -h localhost -U postgres -d dev -c 'CREATE EXTENSION IF NOT EXISTS vector;'
+
+      - name: Typecheck
+        run: pnpm check-types
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm test
