@@ -1,9 +1,9 @@
-import { StandardsSearch } from "~/app/_components/standards-search";
+import { RecommendationSearch } from "~/app/_components/recommendation-search";
 
 export default function Home() {
   return (
     <main className="min-h-screen">
-      <StandardsSearch />
+      <RecommendationSearch />
     </main>
   );
 }

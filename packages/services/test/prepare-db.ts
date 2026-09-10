@@ -1,8 +1,8 @@
 /**
  * Bootstrap Postgres for a DB-backed seam test: apply the Drizzle migrations,
- * load the hand-seeded demo catalogue, and backfill deterministic embeddings.
- * Call it from `beforeAll` so only the suites that need a database pay the cost
- * (pure-logic suites stay infra-free).
+ * load the hand-seeded demo catalogue, backfill deterministic embeddings, and
+ * load the hand-seeded QCO obligations. Call it from `beforeAll` so only the
+ * suites that need a database pay the cost (pure-logic suites stay infra-free).
  *
  * Embeddings use the deterministic fake provider (no OpenAI, no spend) so the
  * semantic half of `standards.search` is exercised offline (docs/PRD.md
@@ -12,6 +12,7 @@
  * locally; the CI workflow provides a pgvector service.
  */
 import { runMigrations } from "@repo/database/migrate";
+import { loadDemoQcos } from "../qco/seed/load";
 import { embedDemoStandards } from "../standards/seed/embed";
 import { loadDemoStandards } from "../standards/seed/load";
 import { fakeEmbeddingProvider } from "./fake-embeddings";
@@ -24,6 +25,7 @@ export function prepareDemoDatabase(): Promise<void> {
       await runMigrations();
       await loadDemoStandards();
       await embedDemoStandards(fakeEmbeddingProvider);
+      await loadDemoQcos();
     } catch (err) {
       throw new Error(
         "seam test setup could not prepare Postgres. Is the database up " +

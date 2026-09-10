@@ -95,9 +95,33 @@ export class StandardsService {
    * column (designation weighted 'A', title 'B', team summary 'C'). Ranked with
    * `ts_rank_cd`; ties broken by the newer edition. Returns `[]` when the query
    * reduces to no searchable terms (e.g. only stop words).
+   *
+   * Two passes: the strict `websearch_to_tsquery` (all terms must match) first,
+   * then — only if it found nothing — the same terms OR-ed together, so one
+   * noise token (a quantity like "500", a stray adjective) can't zero out an
+   * otherwise strong match. The semantic list usually covers this, but the
+   * fallback keeps lexical-only deployments (no embedding key) useful.
    */
   async lexicalSearch(query: string, limit: number): Promise<StandardSearchHit[]> {
-    const tsquery = sql`websearch_to_tsquery('english', ${query})`;
+    const strict = await this.runLexical(
+      sql`websearch_to_tsquery('english', ${query})`,
+      limit,
+    );
+    if (strict.length > 0) return strict;
+
+    return this.runLexical(
+      sql`to_tsquery('english', (
+        select string_agg(quote_literal(lexeme), ' | ')
+        from unnest(tsvector_to_array(to_tsvector('english', ${query}))) as lexeme
+      ))`,
+      limit,
+    );
+  }
+
+  private async runLexical(
+    tsquery: ReturnType<typeof sql>,
+    limit: number,
+  ): Promise<StandardSearchHit[]> {
     const result = await db.execute<RankedRow>(sql`
       select
         "number",
