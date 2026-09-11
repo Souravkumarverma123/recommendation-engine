@@ -41,8 +41,14 @@ export const REASONING_MODEL = "gpt-5-mini";
  * How long to wait for the reasoning call before abandoning it. A hung
  * connection must not hold `recommend.run` open — on timeout the request aborts,
  * the service catches it and returns retrieval-ordered results instead.
+ *
+ * Measured at ~40s for a 13-candidate batch with `gpt-5-mini`'s default
+ * reasoning effort once the reasoner started emitting `conciseAnswer` too
+ * (extra output tokens on every call) — the previous 20s bound was tripping
+ * on essentially every real request, silently degrading to the unfiltered
+ * retrieval list this same change was meant to stop showing.
  */
-export const REASONING_TIMEOUT_MS = 20_000;
+export const REASONING_TIMEOUT_MS = 45_000;
 
 /**
  * Where a standard sits relative to the requirement. `PRIMARY` is the product
