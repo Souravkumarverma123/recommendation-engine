@@ -38,6 +38,13 @@ import { env } from "../env";
 export const REASONING_MODEL = "gpt-5-mini";
 
 /**
+ * How long to wait for the reasoning call before abandoning it. A hung
+ * connection must not hold `recommend.run` open — on timeout the request aborts,
+ * the service catches it and returns retrieval-ordered results instead.
+ */
+export const REASONING_TIMEOUT_MS = 20_000;
+
+/**
  * Where a standard sits relative to the requirement. `PRIMARY` is the product
  * or design standard the tender is really about; the rest are the companions a
  * complete specification also has to name (docs/PRD.md user story 19).
@@ -180,6 +187,7 @@ export class OpenAIRecommendationReasoner implements RecommendationReasoner {
           },
         },
       }),
+      signal: AbortSignal.timeout(REASONING_TIMEOUT_MS),
     });
 
     if (!res.ok) {

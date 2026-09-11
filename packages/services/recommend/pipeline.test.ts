@@ -162,6 +162,34 @@ describe("recommend.run — the LLM reasoning layer (ticket #10)", () => {
     expect(JSON.stringify(output)).not.toMatch(/99999/);
   });
 
+  it("drops a draft clause that cites a standard outside the retrieved candidate set", async () => {
+    const scripted = new ScriptedRecommendationReasoner({
+      requirementSummary: "Office seating.",
+      rankedStandards: [
+        {
+          number: "IS 17631:2022",
+          role: "PRIMARY",
+          reason: "real",
+          evidence: ["office chairs"],
+        },
+      ],
+      gapWarnings: [],
+      // IS 99999 is not in the catalogue and was never a candidate.
+      draftClause: "The goods shall conform to IS 17631:2022 and to IS 99999:2099.",
+    });
+    const guarded = new RecommendService({
+      standards: new StandardsService({ embeddings: fakeEmbeddingProvider }),
+      qco: new QcoService(),
+      reasoner: scripted,
+    });
+
+    const output = await guarded.run({ specText: "500 ergonomic office chairs" });
+
+    expect(output.draftClause).toBeNull();
+    expect(output.reasoned).toBe(true);
+    expect(resultFor(output, "IS 17631:2022")).toBeDefined();
+  });
+
   it("still answers when the reasoner is disabled — retrieval order, no reasoning fields", async () => {
     const bare = new RecommendService({
       standards: new StandardsService({ embeddings: fakeEmbeddingProvider }),

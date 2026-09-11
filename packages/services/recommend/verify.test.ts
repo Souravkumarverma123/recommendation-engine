@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { traceToCandidate, verbatimExcerpts } from "./verify";
+import { citesOnlyCandidates, traceToCandidate, verbatimExcerpts } from "./verify";
 
 /**
  * Pure-logic tests for the post-hoc verification helpers (docs/PRD.md §Pipeline
@@ -51,5 +51,34 @@ describe("traceToCandidate — a designation must trace back to a retrieved cand
 
   it("returns null for an unparseable string", () => {
     expect(traceToCandidate("not a designation", candidates)).toBeNull();
+  });
+});
+
+describe("citesOnlyCandidates — free prose must not name an unlisted standard", () => {
+  const candidates = [{ number: "IS 17631:2022" }, { number: "IS 1489 (Part 1):1991" }];
+
+  it("passes prose that names only retrieved candidates", () => {
+    expect(
+      citesOnlyCandidates(
+        "The goods shall conform to IS 17631 : 2022 and bear the BIS Standard Mark.",
+        candidates,
+      ),
+    ).toBe(true);
+  });
+
+  it("passes prose that names no standard at all", () => {
+    expect(citesOnlyCandidates("The goods shall be of first quality.", candidates)).toBe(true);
+  });
+
+  it("fails prose that slips in a standard outside the candidate set", () => {
+    expect(
+      citesOnlyCandidates("The cement shall conform to IS 8112:2013.", candidates),
+    ).toBe(false);
+  });
+
+  it("matches part/section designations in prose", () => {
+    expect(
+      citesOnlyCandidates("Use IS 1489 (Part 1) : 1991 for the pozzolana cement.", candidates),
+    ).toBe(true);
   });
 });

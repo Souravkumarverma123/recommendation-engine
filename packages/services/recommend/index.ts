@@ -32,7 +32,7 @@ import {
   type ReasonerCandidate,
   type ReasonedStandard,
 } from "./reasoner";
-import { traceToCandidate, verbatimExcerpts } from "./verify";
+import { citesOnlyCandidates, traceToCandidate, verbatimExcerpts } from "./verify";
 
 export interface RecommendServiceDeps {
   standards?: StandardsService;
@@ -114,7 +114,12 @@ export class RecommendService {
             ? warning.evidence
             : null,
       })),
-      draftClause: reasoning.draftClause,
+      // The clause is paste-into-a-tender prose and is not covered by the
+      // ranked-number schema constraint — drop it entirely if it names any
+      // standard outside the retrieved candidate set (docs/PRD.md user story 27).
+      draftClause: citesOnlyCandidates(reasoning.draftClause, checked)
+        ? reasoning.draftClause
+        : null,
     };
   }
 
@@ -126,34 +131,35 @@ export class RecommendService {
   ): Promise<RecommendationReasoning | null> {
     if (!this.reasoner || checked.length === 0) return null;
 
-    // Enrich the retrieval hits with the reviewed scope summary and standard
-    // type — the reasoner classifies roles and quotes evidence far better with
-    // them, and neither is on the lean `standards.search` hit.
-    const meta = await db
-      .select({
-        number: standardsTable.number,
-        typeOfStandard: standardsTable.typeOfStandard,
-        summary: standardsTable.summary,
-      })
-      .from(standardsTable)
-      .where(
-        inArray(
-          standardsTable.number,
-          checked.map((c) => c.number),
-        ),
-      );
-    const metaByNumber = new Map(meta.map((row) => [row.number, row]));
-
-    const candidates: ReasonerCandidate[] = checked.map((c) => ({
-      number: c.number,
-      title: c.title,
-      typeOfStandard: metaByNumber.get(c.number)?.typeOfStandard ?? null,
-      lifecycleStatus: c.lifecycleStatus,
-      regulatoryStatus: c.regulatoryStatus,
-      summary: metaByNumber.get(c.number)?.summary ?? null,
-    }));
-
     try {
+      // Enrich the retrieval hits with the reviewed scope summary and standard
+      // type — the reasoner classifies roles and quotes evidence far better with
+      // them, and neither is on the lean `standards.search` hit. Inside the
+      // try: a metadata-query failure degrades to retrieval-only, as documented.
+      const meta = await db
+        .select({
+          number: standardsTable.number,
+          typeOfStandard: standardsTable.typeOfStandard,
+          summary: standardsTable.summary,
+        })
+        .from(standardsTable)
+        .where(
+          inArray(
+            standardsTable.number,
+            checked.map((c) => c.number),
+          ),
+        );
+      const metaByNumber = new Map(meta.map((row) => [row.number, row]));
+
+      const candidates: ReasonerCandidate[] = checked.map((c) => ({
+        number: c.number,
+        title: c.title,
+        typeOfStandard: metaByNumber.get(c.number)?.typeOfStandard ?? null,
+        lifecycleStatus: c.lifecycleStatus,
+        regulatoryStatus: c.regulatoryStatus,
+        summary: metaByNumber.get(c.number)?.summary ?? null,
+      }));
+
       return await this.reasoner.reason({ specText, language, candidates });
     } catch (error) {
       console.error(

@@ -53,3 +53,23 @@ export function traceToCandidate<T extends { number: string }>(
 ): T | null {
   return candidates.find((candidate) => sameStandard(candidate.number, emittedNumber)) ?? null;
 }
+
+/** A BIS-designation-shaped run inside free prose: "IS 456", "IS 1489 (Part 1) : 1991", "IS/IEC 62368-1:2023". */
+const DESIGNATION_IN_PROSE_RE =
+  /\b(?:IS|SP)(?:\s*\/\s*(?:ISO|IEC))*\s*\d{1,5}(?:\s*\(\s*Part[^)]*\))?(?:\s*:\s*\d{4})?/gi;
+
+/**
+ * True when every BIS designation named in `prose` traces back to one of
+ * `candidates`. The reasoning step's free-text fields (the draft clause above
+ * all) are not covered by the ranked-number schema constraint, so a model could
+ * slip an unlisted or invented standard into a clause an officer then pastes
+ * into a tender. Prose that cites only retrieved candidates — or none at all —
+ * passes (docs/PRD.md user story 27).
+ */
+export function citesOnlyCandidates(
+  prose: string,
+  candidates: readonly { number: string }[],
+): boolean {
+  const cited = prose.match(DESIGNATION_IN_PROSE_RE) ?? [];
+  return cited.every((token) => traceToCandidate(token, candidates) !== null);
+}
