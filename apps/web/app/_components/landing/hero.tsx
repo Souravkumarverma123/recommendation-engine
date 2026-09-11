@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Github } from "lucide-react";
 
 import { CloudShader } from "~/components/ui/cloud-shader";
+
+const GITHUB_URL =
+  "https://github.com/Souravkumarverma123/recommendation-engine";
 
 export function Wordmark({ dark = false }: { dark?: boolean }) {
   return (
@@ -45,12 +48,23 @@ function HeroNav() {
           FAQ
         </a>
       </div>
-      <Link
-        href="/dashboard"
-        className="rounded-full bg-white px-4 py-2 text-[13px] font-semibold text-sky-700 shadow-md transition hover:bg-white/90"
-      >
-        Open the workspace
-      </Link>
+      <div className="flex items-center gap-3">
+        <a
+          href={GITHUB_URL}
+          target="_blank"
+          rel="noreferrer"
+          aria-label="View source on GitHub"
+          className="flex size-9 items-center justify-center rounded-full text-white/85 transition-colors hover:bg-white/10 hover:text-white"
+        >
+          <Github className="size-[18px]" />
+        </a>
+        <Link
+          href="/dashboard"
+          className="rounded-full bg-white px-4 py-2 text-[13px] font-semibold text-sky-700 shadow-md transition hover:bg-white/90"
+        >
+          Open the workspace
+        </Link>
+      </div>
     </nav>
   );
 }
