@@ -9,6 +9,7 @@
 import { loadDemoQcos } from "../../qco/seed/load";
 import { defaultEmbeddingProvider } from "../../llm/embeddings";
 import { embedDemoStandards } from "./embed";
+import { loadDemoEdges } from "./edges";
 import { loadDemoStandards } from "./load";
 
 async function main() {
@@ -17,6 +18,12 @@ async function main() {
     `✅ demo catalogue loaded — ${upserted} reviewed row(s): ${toppedUp} topped up on ` +
       `harvested records, ${upserted - toppedUp} seeded in the demo band, ${pruned} stale ` +
       `row(s) pruned`,
+  );
+
+  const edges = await loadDemoEdges();
+  console.info(
+    `✅ allied-standards graph loaded — ${edges.edges} edge(s), ${edges.companions} ` +
+      `companion row(s), ${edges.pruned} stale row(s) pruned`,
   );
 
   const provider = defaultEmbeddingProvider();

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { standardSearchHitSchema } from "../standards/model";
+import { alliedStandardSchema } from "../standards/allied";
 import { qcoCitationSchema, regulatoryStatusSchema } from "../qco/model";
 import {
   gapWarningSchema,
@@ -49,6 +50,14 @@ export const recommendedStandardSchema = standardSearchHitSchema.extend({
    * verbatim is dropped. Empty when the reasoner did not run.
    */
   evidence: z.array(z.string()),
+  /**
+   * The standards this one depends on — its normative references, test methods,
+   * safety and terminology companions — found by walking the `REFERS_TO` and
+   * `PART_OF` edges out of it, each tagged by role (ticket #11). Empty when the
+   * standard has no ingested allied standards (the graph is only harvested for
+   * the demo slice).
+   */
+  allied: z.array(alliedStandardSchema),
 });
 export type RecommendedStandard = z.infer<typeof recommendedStandardSchema>;
 

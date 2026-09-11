@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "harvest": "dotenv -- tsx src/main.ts",
+    "harvest:details": "dotenv -- tsx src/details-main.ts",
     "lint": "eslint .",
     "check-types": "tsc --noEmit",
     "test": "vitest run"

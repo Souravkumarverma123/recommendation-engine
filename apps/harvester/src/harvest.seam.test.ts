@@ -1,12 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { and, db, desc, eq, gte, lt } from "@repo/database";
+import { and, db, desc, eq, gte, lt, or } from "@repo/database";
 import { harvestRunsTable, standardsTable } from "@repo/database/schema";
 import { runMigrations } from "@repo/database/migrate";
 import type { BisListItem } from "@repo/services/bis/model";
 import type { EmbeddingProvider } from "@repo/services/llm/embeddings";
 import { fakeEmbeddingProvider } from "@repo/services/test/fake-embeddings";
-import { DEMO_BIS_ID_MIN } from "@repo/services/standards/seed/demo-standards.data";
+import {
+  DEMO_BIS_ID_MAX,
+  DEMO_BIS_ID_MIN,
+} from "@repo/services/standards/seed/demo-standards.data";
 import { embedDemoStandards } from "@repo/services/standards/seed/embed";
 import { loadDemoStandards } from "@repo/services/standards/seed/load";
 import { StandardsService } from "@repo/services/standards";
@@ -32,11 +35,18 @@ const TEST_ID_MAX = 8_200_000;
 /** Stands in for a real harvested row in the demo top-up test. */
 const HARVESTED_IS_456_ID = 8_050_000;
 
-/** Everything a full harvest would write lives below the reserved demo id band. */
-const harvestedRows = lt(standardsTable.bisStandardId, DEMO_BIS_ID_MIN);
+/**
+ * Everything not hand-seeded: a full harvest's rows sit below the demo band,
+ * and the allied-standards seed's companion rows (ticket #11) sit above it.
+ * Both must be gone so the embed-backfill count assertions are exact.
+ */
+const nonSeedRows = or(
+  lt(standardsTable.bisStandardId, DEMO_BIS_ID_MIN),
+  gte(standardsTable.bisStandardId, DEMO_BIS_ID_MAX),
+);
 
 async function resetToDemoSlice() {
-  await db.delete(standardsTable).where(harvestedRows);
+  await db.delete(standardsTable).where(nonSeedRows);
   await db.delete(harvestRunsTable);
   await loadDemoStandards();
   // Give the demo rows vectors so a later `embedCatalogue` only touches what the

@@ -244,5 +244,48 @@ describe("recommend.run — the LLM reasoning layer (ticket #10)", () => {
     expect(chair).toBeDefined();
     expect(chair?.role).toBeNull();
     expect(chair?.regulatoryStatus).toBe("MANDATORY"); // independent check still runs
+    // Allied standards come from the graph, not the reasoner — still attached.
+    expect(chair?.allied.length ?? 0).toBeGreaterThan(0);
+  });
+});
+
+describe("recommend.run — allied standards (ticket #11)", () => {
+  it("attaches the allied standards of the office-chair standard, tagged by role", async () => {
+    const output = await recommend.run({ specText: "500 ergonomic office chairs" });
+    const chair = resultFor(output, "IS 17631:2022");
+
+    expect(chair?.allied.length).toBeGreaterThan(0);
+    // AC5: at least one referenced test-method or safety standard of IS 17631.
+    expect(
+      chair?.allied.some((a) => a.role === "TEST_METHOD" || a.role === "SAFETY"),
+    ).toBe(true);
+
+    for (const ally of chair?.allied ?? []) {
+      expect(ally.number).toBeTruthy();
+      expect(ally.title).toBeTruthy();
+      expect(["REFERS_TO", "PART_OF"]).toContain(ally.relation);
+      expect([
+        "NORMATIVE_REFERENCE",
+        "TEST_METHOD",
+        "SAFETY",
+        "TERMINOLOGY",
+        "INSTALLATION",
+      ]).toContain(ally.role);
+    }
+  });
+
+  it("lists the normative references of IS 456 as allied standards", async () => {
+    const output = await recommend.run({ specText: "RCC structural work per IS 456" });
+    const concrete = resultFor(output, "IS 456:2000");
+
+    const alliedNumbers = concrete?.allied.map((a) => a.number) ?? [];
+    expect(alliedNumbers).toContain("IS 269:2015");
+    expect(concrete?.allied.some((a) => a.role === "TEST_METHOD")).toBe(true);
+  });
+
+  it("leaves allied empty for a standard with no ingested graph neighbours", async () => {
+    const output = await recommend.run({ specText: "portland pozzolana cement fly ash" });
+    const ppc = resultFor(output, "IS 1489 (Part 1):1991");
+    expect(ppc?.allied).toEqual([]);
   });
 });
