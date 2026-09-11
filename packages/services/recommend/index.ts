@@ -1,9 +1,19 @@
 /**
  * The recommendation pipeline (docs/PRD.md §The recommendation pipeline).
  *
- * Today: hybrid retrieval → version resolution → independent QCO check per
- * candidate → LLM reasoning (ranking, role classification, evidence, gap
- * warnings, draft clause) → post-hoc verification → assembled response.
+ * Today: language detection/normalisation → hybrid retrieval → version
+ * resolution → independent QCO check per candidate → LLM reasoning (ranking,
+ * role classification, evidence, gap warnings, draft clause) → post-hoc
+ * verification → assembled response.
+ *
+ * Language detection is script-based (`recommend/language.ts`, ticket #13):
+ * an explicit `language` hint always wins, otherwise Devanagari in `specText`
+ * selects `"hi"`. A Hindi `specText` is translated to English *only* for the
+ * retrieval and horizontal-QCO-scope calls (`normalizeForRetrieval`,
+ * `llm/translation.ts`) — everything else, including the reasoner and
+ * verbatim-evidence checking, still sees the officer's original text, so
+ * standard designations stay canonical and evidence excerpts stay true
+ * quotes regardless of query language (user stories 21-23).
  *
  * Version resolution runs first, ahead of the QCO check and the reasoner
  * (docs/PRD.md §Pipeline step 7, user stories 7-10, ticket #12): a withdrawn
@@ -22,10 +32,12 @@
 import { db, inArray } from "@repo/database";
 import { standardsTable } from "@repo/database/schema";
 
+import { defaultQueryTranslator, type QueryTranslator } from "../llm/translation";
 import { qcoService, QcoService } from "../qco";
 import { standardsService, StandardsService } from "../standards";
 import type { StandardSearchHit } from "../standards/model";
 import type { VersionResolution } from "../standards/version";
+import { detectLanguage, isHindiScript } from "./language";
 import {
   recommendRunInputSchema,
   type RecommendedStandard,
@@ -51,6 +63,13 @@ export interface RecommendServiceDeps {
    * reasoning and `run()` returns retrieval-ordered results.
    */
   reasoner?: RecommendationReasoner | null;
+  /**
+   * Hindi → English query translation for retrieval (ticket #13). Defaults to
+   * the OpenAI translator when `OPENAI_API_KEY` is set (never in tests —
+   * inject a fake). `null` disables translation and a Hindi query searches
+   * with its own (untranslated) text.
+   */
+  translator?: QueryTranslator | null;
 }
 
 /** A retrieved candidate with its independent regulatory verdict attached. */
@@ -71,18 +90,34 @@ export class RecommendService {
   private readonly standards: StandardsService;
   private readonly qco: QcoService;
   private readonly reasoner: RecommendationReasoner | null;
+  private readonly translator: QueryTranslator | null;
 
   constructor(deps: RecommendServiceDeps = {}) {
     this.standards = deps.standards ?? standardsService;
     this.qco = deps.qco ?? qcoService;
     this.reasoner =
       deps.reasoner === undefined ? defaultRecommendationReasoner() : deps.reasoner;
+    this.translator =
+      deps.translator === undefined ? defaultQueryTranslator() : deps.translator;
   }
 
   async run(input: RecommendRunInput): Promise<RecommendRunOutput> {
-    const { specText, language, limit } = recommendRunInputSchema.parse(input);
+    const { specText, language: languageHint, limit } = recommendRunInputSchema.parse(input);
+    const language = languageHint ?? detectLanguage(specText);
 
-    const { results: hits } = await this.standards.search({ query: specText, limit });
+    // Retrieval (lexical FTS + the concept embedder in tests) only knows
+    // English; a Hindi requirement is translated for this call alone — the
+    // original `specText` still drives everything downstream (docs/PRD.md
+    // §Pipeline step 1, ticket #13). The QCO scope check below intentionally
+    // keeps using `specText`, not this translated copy: its horizontal-QCO
+    // predicates are English regexes that a Hindi query cannot reach either
+    // way, and routing an independently-verified regulatory verdict through
+    // an unverified translation would make MANDATORY/VOLUNTARY depend on
+    // translation fidelity — exactly what `QcoService` is meant to be immune
+    // to (docs/PRD.md §Architecture, user story 12).
+    const retrievalText = await this.normalizeForRetrieval(specText);
+
+    const { results: hits } = await this.standards.search({ query: retrievalText, limit });
     const { hits: resolvedHits, supersedesByNumber, concurrentByNumber } =
       await this.resolveHitVersions(hits);
 
@@ -149,6 +184,33 @@ export class RecommendService {
         ? reasoning.draftClause
         : null,
     };
+  }
+
+  /**
+   * An English copy of a Hindi query for retrieval (ticket #13). A no-op for
+   * text that is not Hindi-scripted. Standard designations are ASCII already
+   * and pass through untouched; only the surrounding Hindi prose is
+   * translated. A missing translator, a failed call, or a translation that
+   * collapses to nothing usable (a query built entirely from function words
+   * the translator drops) all degrade to searching with the original text —
+   * `standardsSearchInputSchema` requires a non-empty query, and a Hindi
+   * query still reaches the concept embedder's real multilingual counterpart
+   * in production (`text-embedding-3-small`) regardless, so this is a
+   * best-effort boost to recall, not a hard dependency.
+   */
+  private async normalizeForRetrieval(specText: string): Promise<string> {
+    if (!this.translator || !isHindiScript(specText)) return specText;
+
+    try {
+      const translated = await this.translator.translateToEnglish(specText);
+      return translated.trim().length > 0 ? translated : specText;
+    } catch (error) {
+      console.error(
+        "recommend.run: query translation failed, searching with the original text —",
+        error instanceof Error ? error.message : String(error),
+      );
+      return specText;
+    }
   }
 
   /**

@@ -5,6 +5,7 @@ import {
   fakeRecommendationReasoner,
   ScriptedRecommendationReasoner,
 } from "../test/fake-reasoner";
+import { fakeQueryTranslator } from "../test/fake-translator";
 import { freezeClock } from "../test/frozen-clock";
 import { prepareDemoDatabase } from "../test/prepare-db";
 import { QcoService } from "../qco";
@@ -340,5 +341,119 @@ describe("recommend.run — supersession resolution (ticket #12, scenario 3)", (
     expect(current?.supersedes).toContain("IS 8112:2013");
     const warning = output.gapWarnings.find((w) => w.kind === "SUPERSEDED_CITATION");
     expect(warning?.evidence).toBe("IS 8112");
+  });
+});
+
+describe("recommend.run — Hindi input (ticket #13, scenario 4)", () => {
+  const HINDI_RE = /[ऀ-ॿ]/;
+  const spec = "कार्यालय के लिए 500 एर्गोनॉमिक कुर्सियाँ चाहिए"; // "500 ergonomic office chairs needed"
+
+  const hindiReasoner = new ScriptedRecommendationReasoner({
+    requirementSummary: "कार्यालय के लिए 500 एर्गोनॉमिक कुर्सियों की खरीद।",
+    rankedStandards: [
+      {
+        number: "IS 17631:2022",
+        role: "PRIMARY",
+        reason:
+          "यह मानक कार्यालय की एर्गोनॉमिक कुर्सियों की आवश्यकताओं और परीक्षण विधियों को निर्दिष्ट करता है।",
+        evidence: [],
+      },
+    ],
+    gapWarnings: [],
+    draftClause:
+      "आपूर्ति की गई कुर्सियाँ IS 17631:2022 के अनुरूप होंगी और आपूर्तिकर्ता को लाइसेंस के तहत BIS मानक चिह्न धारण करना होगा।",
+  });
+
+  it("the scenario-1 requirement phrased in Hindi still returns IS 17631:2022 MANDATORY, explained in Hindi", async () => {
+    const hindiService = new RecommendService({
+      standards: new StandardsService({ embeddings: fakeEmbeddingProvider }),
+      qco: new QcoService(),
+      reasoner: hindiReasoner,
+      translator: fakeQueryTranslator,
+    });
+
+    const output = await hindiService.run({ specText: spec });
+
+    // No `language` hint was passed — Devanagari in `specText` alone selects "hi".
+    expect(output.language).toBe("hi");
+    expect(output.query).toBe(spec);
+
+    const chair = resultFor(output, "IS 17631:2022");
+    expect(chair).toBeDefined();
+    expect(chair?.regulatoryStatus).toBe("MANDATORY");
+    expect(chair?.qco?.soNumbers).toContain("S.O. 801(E)");
+    expect(chair?.qco?.enforcementDate).toBe("2026-08-14");
+
+    expect(chair?.reason).toMatch(HINDI_RE);
+    expect(output.requirementSummary).toMatch(HINDI_RE);
+    expect(output.draftClause).toMatch(HINDI_RE);
+    expect(output.draftClause).toMatch(/IS 17631:2022/);
+  });
+
+  it("an explicit language hint wins over detection", async () => {
+    const hindiService = new RecommendService({
+      standards: new StandardsService({ embeddings: fakeEmbeddingProvider }),
+      qco: new QcoService(),
+      reasoner: hindiReasoner,
+      translator: fakeQueryTranslator,
+    });
+
+    const output = await hindiService.run({ specText: spec, language: "en" });
+    expect(output.language).toBe("en");
+  });
+
+  it("without retrieval normalisation, the same Hindi requirement surfaces nothing", async () => {
+    const unnormalized = new RecommendService({
+      standards: new StandardsService({ embeddings: fakeEmbeddingProvider }),
+      qco: new QcoService(),
+      reasoner: null,
+      translator: null,
+    });
+
+    const output = await unnormalized.run({ specText: spec });
+    expect(resultFor(output, "IS 17631:2022")).toBeUndefined();
+  });
+
+  it("a translation that collapses to nothing usable falls back to the original text instead of crashing", async () => {
+    // A Hindi query built entirely from words the translator maps to "" —
+    // `standardsSearchInputSchema` rejects an empty query, so a translator
+    // this unhelpful must not be allowed to produce one.
+    const blankTranslator = { translateToEnglish: () => Promise.resolve("   ") };
+    const guarded = new RecommendService({
+      standards: new StandardsService({ embeddings: fakeEmbeddingProvider }),
+      qco: new QcoService(),
+      reasoner: null,
+      translator: blankTranslator,
+    });
+
+    await expect(guarded.run({ specText: spec })).resolves.not.toThrow();
+  });
+
+  it("the independent QCO check always sees the officer's original text, never the retrieval translation", async () => {
+    // A translator that rewrites the query entirely has no way to move the
+    // regulatory badge — `checkStatus` must still be called with `specText`.
+    const seenProductText: (string | undefined)[] = [];
+    const spyingQco: Pick<QcoService, "checkStatus"> = {
+      checkStatus: (checkInput) => {
+        seenProductText.push(checkInput.productText ?? undefined);
+        return Promise.resolve({ status: "VOLUNTARY", qco: null, note: null });
+      },
+    };
+    // Deliberately not what `fakeQueryTranslator` would produce for `spec` —
+    // proves `checkStatus` reads `specText`, not whatever this returns.
+    const misleadingTranslator = { translateToEnglish: () => Promise.resolve("office chair") };
+    const guarded = new RecommendService({
+      standards: new StandardsService({ embeddings: fakeEmbeddingProvider }),
+      qco: spyingQco as QcoService,
+      reasoner: null,
+      translator: misleadingTranslator,
+    });
+
+    await guarded.run({ specText: spec });
+
+    expect(seenProductText.length).toBeGreaterThan(0);
+    for (const productText of seenProductText) {
+      expect(productText).toBe(spec);
+    }
   });
 });

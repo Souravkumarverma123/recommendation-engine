@@ -23,8 +23,13 @@ import {
 export const recommendRunInputSchema = z.object({
   /** The procurement requirement — a product description, spec, or tender clause. */
   specText: z.string().trim().min(1).max(8000),
-  /** Response language. Echoed back today; translation is a later ticket. */
-  language: z.enum(["en", "hi"]).optional().default("en"),
+  /**
+   * Response language. Optional — when omitted, `RecommendService.run`
+   * detects it from `specText` (Devanagari script → `"hi"`, else `"en"`;
+   * `recommend/language.ts`, ticket #13). An explicit hint always wins over
+   * detection, e.g. to ask for an English response to a Hindi requirement.
+   */
+  language: z.enum(["en", "hi"]).optional(),
   /** How many ranked standards to return. */
   limit: z.number().int().min(1).max(50).optional().default(15),
 });
