@@ -152,15 +152,16 @@ export class RecommendService {
         requirementSummary: null,
         gapWarnings: versionWarnings,
         draftClause: null,
+        conciseAnswer: null,
       };
     }
+
+    const assembled = assembleResults(checked, reasoning.rankedStandards, specText);
 
     return {
       query: specText,
       language,
-      results: await this.attachAllied(
-        assembleResults(checked, reasoning.rankedStandards, specText),
-      ),
+      results: await this.attachAllied(assembled),
       reasoned: true,
       requirementSummary: reasoning.requirementSummary,
       // Gap-warning evidence is subject to the same "must be from the input"
@@ -177,11 +178,18 @@ export class RecommendService {
               : null,
         })),
       ),
-      // The clause is paste-into-a-tender prose and is not covered by the
-      // ranked-number schema constraint — drop it entirely if it names any
-      // standard outside the retrieved candidate set (docs/PRD.md user story 27).
-      draftClause: citesOnlyCandidates(reasoning.draftClause, checked)
+      // The clause and the concise answer are free-text prose, not covered by
+      // the ranked-number schema constraint, so each is verified independently
+      // against `assembled` — the standards the reasoner actually kept — not
+      // `checked` (every retrieved candidate). A candidate the reasoner
+      // dropped as inapplicable is exactly what this prose must not name;
+      // checking against the wider retrieval set would let it back in
+      // (docs/PRD.md user story 27).
+      draftClause: citesOnlyCandidates(reasoning.draftClause, assembled)
         ? reasoning.draftClause
+        : null,
+      conciseAnswer: citesOnlyCandidates(reasoning.conciseAnswer, assembled)
+        ? reasoning.conciseAnswer
         : null,
     };
   }
@@ -357,9 +365,13 @@ export class RecommendService {
 
 /**
  * Merge the retrieved+checked candidates with the reasoning step's ranking.
- * Order follows the model's ranking for the standards it ranked *and* that
- * survive verification; candidates it did not rank are appended in retrieval
- * order so their independent regulatory badge is never lost.
+ * Only candidates the reasoner actually ranked as applicable — and that
+ * survive verification — are returned, in the model's ranked order. The
+ * reasoner is explicitly instructed to omit candidates that do not directly
+ * answer the requirement (`reasoner.ts` rule 2); a candidate it left out is
+ * retrieval noise (e.g. a broad lexical-fallback match) rather than something
+ * the officer asked about, so it is dropped here instead of being
+ * re-appended with an empty role.
  */
 function assembleResults(
   checked: CheckedCandidate[],
@@ -386,11 +398,6 @@ function assembleResults(
       reason: entry.reason,
       evidence: verbatimExcerpts(entry.evidence, specText),
     });
-  }
-
-  for (const candidate of checked) {
-    if (used.has(candidate.number)) continue;
-    results.push(unreasoned(candidate));
   }
 
   return results;

@@ -129,6 +129,19 @@ function gapWarningsFor(specText: string, candidates: ReasonerCandidate[]): GapW
   return warnings;
 }
 
+function conciseAnswerFor(primary: ReasonerCandidate | undefined, specText: string): string {
+  if (!primary) {
+    return `For "${specText.slice(0, 80)}", no directly applicable Indian Standard was identified among the retrieved candidates. Refine the product description and try again.`;
+  }
+  const cert =
+    primary.regulatoryStatus === "MANDATORY" || primary.regulatoryStatus === "UPCOMING"
+      ? "BIS certification is mandatory — require the Standard Mark under licence."
+      : primary.regulatoryStatus === "VOLUNTARY"
+        ? "No QCO applies — require conformity without the Standard Mark."
+        : "Certification applicability needs confirmation before finalising the clause.";
+  return `For your requirement, ${primary.number} (${primary.title}) is the applicable standard. ${cert}`;
+}
+
 function draftClauseFor(primary: ReasonerCandidate | undefined, specText: string): string {
   if (!primary) {
     return `The goods supplied shall conform to the applicable Indian Standards for: ${specText}.`;
@@ -164,6 +177,7 @@ export class FakeRecommendationReasoner implements RecommendationReasoner {
       rankedStandards,
       gapWarnings: gapWarningsFor(specText, candidates),
       draftClause: draftClauseFor(primary, specText),
+      conciseAnswer: conciseAnswerFor(primary, specText),
     });
   }
 }

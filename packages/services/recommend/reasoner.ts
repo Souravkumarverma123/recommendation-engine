@@ -41,8 +41,14 @@ export const REASONING_MODEL = "gpt-5-mini";
  * How long to wait for the reasoning call before abandoning it. A hung
  * connection must not hold `recommend.run` open — on timeout the request aborts,
  * the service catches it and returns retrieval-ordered results instead.
+ *
+ * Measured at ~40s for a 13-candidate batch with `gpt-5-mini`'s default
+ * reasoning effort once the reasoner started emitting `conciseAnswer` too
+ * (extra output tokens on every call) — the previous 20s bound was tripping
+ * on essentially every real request, silently degrading to the unfiltered
+ * retrieval list this same change was meant to stop showing.
  */
-export const REASONING_TIMEOUT_MS = 20_000;
+export const REASONING_TIMEOUT_MS = 45_000;
 
 /**
  * Where a standard sits relative to the requirement. `PRIMARY` is the product
@@ -99,6 +105,13 @@ export const recommendationReasoningSchema = z.object({
   gapWarnings: z.array(gapWarningSchema),
   /** Ready-to-paste tender clause language for the primary standard. */
   draftClause: z.string(),
+  /**
+   * Short 2-3 sentence answer in the requested language, directly answering
+   * what was asked. Length-bounded (not just prompt-instructed, rule 8) so an
+   * empty or runaway-length response fails schema validation — `reason()`
+   * degrades to retrieval-only rather than rendering it to the officer.
+   */
+  conciseAnswer: z.string().trim().min(1).max(500),
 });
 export type RecommendationReasoning = z.infer<typeof recommendationReasoningSchema>;
 
@@ -127,16 +140,17 @@ export interface RecommendationReasoner {
 const SYSTEM_PROMPT = [
   "You assist an Indian government procurement officer drafting a tender.",
   "You are given a procurement requirement and a numbered list of candidate Indian Standards retrieved from the BIS catalogue.",
-  "Your job is reasoning only — ranking, role classification, evidence, gap warnings and draft clause language.",
+  "Your job is reasoning only — ranking, role classification, evidence, gap warnings, draft clause language and a concise answer.",
   "",
   "Hard rules:",
   "1. Every `number` you emit MUST be copied verbatim from a candidate's designation. Never invent, correct or reformat a designation, and never cite a standard that is not in the list.",
-  "2. Rank the candidates that genuinely apply to the requirement, best first. Drop candidates that do not apply rather than padding the list.",
+  "2. Rank ONLY candidates that directly answer what the officer asked, best first. Be strict — drop any candidate that is only loosely or tangentially related. Never pad the list with unrelated standards. If the officer asks about X, return only standards for X — do not add standards for other topics that were not asked about.",
   "3. Classify each ranked standard's role: PRIMARY (the product/design standard the tender is about), NORMATIVE_REFERENCE, TEST_METHOD, SAFETY, TERMINOLOGY, INSTALLATION, or RELATED.",
   "4. `evidence` for each standard must be verbatim substrings of the officer's input — the phrases that triggered the pick. If nothing in the input specifically triggered it, use an empty list.",
   "5. Gap warnings describe defects in the officer's draft: BRAND_NAME (a proprietary/brand term), FOREIGN_STANDARD (an ISO/IEC/ASTM/EN/BS/DIN standard cited where an Indian Standard exists), NON_METRIC_UNIT, SUPERSEDED_CITATION (the input cites a standard shown as withdrawn), MISSING_PARAMETER, or OTHER. `evidence` must be a verbatim substring of the input, or null.",
   "6. The regulatory status of each candidate is authoritative and already decided — do not contradict it. Word the draft clause to match: for MANDATORY or UPCOMING, require the BIS Standard Mark under licence; for VOLUNTARY, require conformity to the standard with no certification-mark language; for NEEDS_REVIEW, note that certification applicability needs confirmation.",
-  "7. Write `requirementSummary`, `reason`, `message` and `draftClause` in the requested language. Keep every standard designation and title in its canonical form regardless of language.",
+  "7. Write `requirementSummary`, `reason`, `message`, `draftClause` and `conciseAnswer` in the requested language. Keep every standard designation and title in its canonical form regardless of language.",
+  "8. `conciseAnswer` must be a short, clear 2-3 sentence summary in the requested language that directly answers only what was asked, in plain officer-friendly language. Reference the primary standard by number, state its key point and certification position in one line, and do not mention standards you dropped. Keep it under 70 words.",
 ].join("\n");
 
 interface OpenAIChatResponse {

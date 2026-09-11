@@ -149,6 +149,7 @@ describe("recommend.run — the LLM reasoning layer (ticket #10)", () => {
       ],
       gapWarnings: [],
       draftClause: "The goods shall conform to IS 17631:2022.",
+      conciseAnswer: "IS 17631:2022 is the applicable standard for the office chairs.",
     });
     const guarded = new RecommendService({
       standards: new StandardsService({ embeddings: fakeEmbeddingProvider }),
@@ -177,6 +178,7 @@ describe("recommend.run — the LLM reasoning layer (ticket #10)", () => {
       gapWarnings: [],
       // IS 99999 is not in the catalogue and was never a candidate.
       draftClause: "The goods shall conform to IS 17631:2022 and to IS 99999:2099.",
+      conciseAnswer: "IS 17631:2022 is the applicable standard for the office chairs.",
     });
     const guarded = new RecommendService({
       standards: new StandardsService({ embeddings: fakeEmbeddingProvider }),
@@ -211,6 +213,7 @@ describe("recommend.run — the LLM reasoning layer (ticket #10)", () => {
       gapWarnings: [],
       draftClause:
         "The cement supplied shall conform to IS 269:2015 and bear the BIS Standard Mark under licence.",
+      conciseAnswer: "IS 269:2015 is the applicable standard for the cement supply.",
     });
     const guided = new RecommendService({
       standards: new StandardsService({ embeddings: fakeEmbeddingProvider }),
@@ -362,6 +365,7 @@ describe("recommend.run — Hindi input (ticket #13, scenario 4)", () => {
     gapWarnings: [],
     draftClause:
       "आपूर्ति की गई कुर्सियाँ IS 17631:2022 के अनुरूप होंगी और आपूर्तिकर्ता को लाइसेंस के तहत BIS मानक चिह्न धारण करना होगा।",
+    conciseAnswer: "IS 17631:2022 कार्यालय की कुर्सियों के लिए लागू मानक है।",
   });
 
   it("the scenario-1 requirement phrased in Hindi still returns IS 17631:2022 MANDATORY, explained in Hindi", async () => {
