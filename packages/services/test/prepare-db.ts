@@ -23,6 +23,7 @@ import { harvestRunsTable, standardsTable } from "@repo/database/schema";
 import { runMigrations } from "@repo/database/migrate";
 import { loadDemoQcos } from "../qco/seed/load";
 import { embedDemoStandards } from "../standards/seed/embed";
+import { loadDemoEdges } from "../standards/seed/edges";
 import { loadDemoStandards } from "../standards/seed/load";
 import { DEMO_BIS_ID_MIN } from "../standards/seed/demo-standards.data";
 import { fakeEmbeddingProvider } from "./fake-embeddings";
@@ -37,6 +38,7 @@ export function prepareDemoDatabase(): Promise<void> {
       await db.delete(standardsTable).where(lt(standardsTable.bisStandardId, DEMO_BIS_ID_MIN));
       await db.delete(harvestRunsTable);
       await loadDemoStandards();
+      await loadDemoEdges();
       await embedDemoStandards(fakeEmbeddingProvider);
       await loadDemoQcos();
     } catch (err) {

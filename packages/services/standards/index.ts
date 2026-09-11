@@ -16,6 +16,12 @@ import {
   type StandardsSearchInput,
   type StandardsSearchOutput,
 } from "./model";
+import {
+  ALLIED_EDGE_TYPES,
+  resolveAlliedRole,
+  type AlliedRelation,
+  type AlliedStandard,
+} from "./allied";
 
 interface RankedRow extends Record<string, unknown> {
   number: string;
@@ -164,6 +170,87 @@ export class StandardsService {
     `);
 
     return result.rows.map(toHit);
+  }
+
+  /**
+   * The allied standards of each designation in `numbers` — the neighbours
+   * reached by walking `REFERS_TO` and `PART_OF` edges out of it, tagged by the
+   * role they play in a specification (docs/PRD.md user stories 17–19).
+   *
+   * Only edges whose target resolved to an ingested `standards` row are
+   * returned: an unresolved reference has no title to show and no type to
+   * classify. Results are keyed by the source designation exactly as passed in;
+   * a designation with no allied standards is absent from the map. Deduplicated
+   * per source — a standard reached by more than one edge appears once, the
+   * more specific `REFERS_TO` winning over `PART_OF`.
+   */
+  async allied(numbers: string[]): Promise<Map<string, AlliedStandard[]>> {
+    const wanted = [...new Set(numbers)].filter((n) => n.length > 0);
+    if (wanted.length === 0) return new Map();
+
+    const numberList = sql.join(
+      wanted.map((n) => sql`${n}`),
+      sql`, `,
+    );
+    const typeList = sql.join(
+      ALLIED_EDGE_TYPES.map((t) => sql`${t}`),
+      sql`, `,
+    );
+    const rows = await db.execute<{
+      src_number: string;
+      relation: string;
+      number: string;
+      title: string;
+      is_status: number | null;
+      type_of_standard: string | null;
+      props: unknown;
+    }>(sql`
+      select
+        src."number"          as src_number,
+        e."type"              as relation,
+        dst."number"          as "number",
+        dst.title             as title,
+        dst.is_status         as is_status,
+        dst.type_of_standard  as type_of_standard,
+        e.props               as props
+      from standard_edges e
+      join standards src on src.id = e.src_standard_id
+      join standards dst on dst.id = e.dst_standard_id
+      where src."number" in (${numberList})
+        and e."type" in (${typeList})
+      order by src_number, dst."number"
+    `);
+
+    const byNumber = new Map<string, Map<string, AlliedStandard>>();
+    for (const row of rows.rows) {
+      const relation = row.relation as AlliedRelation;
+      const bucket = byNumber.get(row.src_number) ?? new Map<string, AlliedStandard>();
+      const existing = bucket.get(row.number);
+      // REFERS_TO is the more informative edge — let it win a tie with PART_OF.
+      if (existing && !(existing.relation === "PART_OF" && relation === "REFERS_TO")) {
+        continue;
+      }
+      bucket.set(row.number, {
+        number: row.number,
+        title: row.title,
+        role: resolveAlliedRole(row.props, {
+          title: row.title,
+          typeOfStandard: row.type_of_standard,
+        }),
+        relation,
+        lifecycleStatus: toLifecycleStatus(row.is_status),
+      });
+      byNumber.set(row.src_number, bucket);
+    }
+
+    return new Map(
+      [...byNumber].map(([src, bucket]) => [
+        src,
+        [...bucket.values()].sort(
+          (a, b) => a.role.localeCompare(b.role) || a.number.localeCompare(b.number),
+        ),
+      ]),
+    );
   }
 }
 

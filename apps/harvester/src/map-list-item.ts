@@ -50,7 +50,7 @@ export function mapListItem(item: BisListItem): InsertStandard | null {
  * malformed value from BIS ("2026-99-99", "0000-00-00") becomes null rather
  * than reaching Postgres and failing the whole upsert batch.
  */
-function toDateString(value: string | null | undefined): string | null {
+export function toDateString(value: string | null | undefined): string | null {
   if (!value) return null;
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value.trim());
   if (!match) return null;

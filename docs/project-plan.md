@@ -65,8 +65,8 @@
 **Goal: all 5 domains + the features that impress.**
 - [ ] A: eager-harvest the other 4 domains' committees; parse Steel / Electronics (CRS) / Helmet / **Furniture (S.O. 801(E), phased dates)** QCOs; tag IS 456 / IS 800 as codes-of-practice with no QCO (the voluntary examples); lazy-cache anything outside the slice
 - [ ] A: Docling batch over ~300–500 demo-slice PDFs (law.resource.org) → clause 1/2/3 + test-method lines
-- [ ] B: **graph expansion** (walk REFERS_TO / PART_OF / same-committee from candidates → allied/normative/test-method)
-- [ ] B: **role classifier** (applicable / normative / test-method / safety / terminology / installation)
+- [x] B: **graph expansion** (walk REFERS_TO / PART_OF from candidates → allied/normative/test-method) — ticket #11
+- [x] B: **role classifier** (normative / test-method / safety / terminology / installation) — ticket #11
 - [ ] B: **Hindi input** — detect + normalise/translate query → English for retrieval; answer in Hindi
 - [ ] B: concurrent-running + upcoming-QCO handling
 - [ ] C: multilingual UI, gap-warnings panel (brand names, foreign-standard-where-IS-exists, non-metric units), draft tender clause

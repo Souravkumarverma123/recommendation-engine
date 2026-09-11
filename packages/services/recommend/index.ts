@@ -46,10 +46,16 @@ export interface RecommendServiceDeps {
 }
 
 /** A retrieved candidate with its independent regulatory verdict attached. */
-type CheckedCandidate = Omit<RecommendedStandard, "role" | "reason" | "evidence">;
+type CheckedCandidate = Omit<
+  RecommendedStandard,
+  "role" | "reason" | "evidence" | "allied"
+>;
+
+/** A result before its allied standards are attached — the reasoning fields are set, `allied` is not. */
+type PreAlliedResult = Omit<RecommendedStandard, "allied">;
 
 /** A checked candidate with empty reasoning fields — the reasoner did not rank it (or did not run). */
-function unreasoned(candidate: CheckedCandidate): RecommendedStandard {
+function unreasoned(candidate: CheckedCandidate): PreAlliedResult {
   return { ...candidate, role: null, reason: null, evidence: [] };
 }
 
@@ -91,7 +97,7 @@ export class RecommendService {
       return {
         query: specText,
         language,
-        results: checked.map(unreasoned),
+        results: await this.attachAllied(checked.map(unreasoned)),
         reasoned: false,
         requirementSummary: null,
         gapWarnings: [],
@@ -102,7 +108,9 @@ export class RecommendService {
     return {
       query: specText,
       language,
-      results: assembleResults(checked, reasoning.rankedStandards, specText),
+      results: await this.attachAllied(
+        assembleResults(checked, reasoning.rankedStandards, specText),
+      ),
       reasoned: true,
       requirementSummary: reasoning.requirementSummary,
       // Gap-warning evidence is subject to the same "must be from the input"
@@ -169,6 +177,32 @@ export class RecommendService {
       return null;
     }
   }
+
+  /**
+   * Attach each result's allied standards (docs/PRD.md pipeline step 4). One
+   * graph query for the whole result set; a walk failure degrades to no allied
+   * standards rather than failing the recommendation — the ranked list and the
+   * regulatory badges matter more.
+   */
+  private async attachAllied(
+    results: PreAlliedResult[],
+  ): Promise<RecommendedStandard[]> {
+    let alliedByNumber: Map<string, RecommendedStandard["allied"]>;
+    try {
+      alliedByNumber = await this.standards.allied(results.map((r) => r.number));
+    } catch (error) {
+      console.error(
+        "recommend.run: allied-standards walk failed, returning results without them —",
+        error instanceof Error ? error.message : String(error),
+      );
+      alliedByNumber = new Map();
+    }
+
+    return results.map((result) => ({
+      ...result,
+      allied: alliedByNumber.get(result.number) ?? [],
+    }));
+  }
 }
 
 /**
@@ -181,9 +215,9 @@ function assembleResults(
   checked: CheckedCandidate[],
   ranked: ReasonedStandard[],
   specText: string,
-): RecommendedStandard[] {
+): PreAlliedResult[] {
   const used = new Set<string>();
-  const results: RecommendedStandard[] = [];
+  const results: PreAlliedResult[] = [];
 
   for (const entry of ranked) {
     const candidate = traceToCandidate(entry.number, checked);

@@ -9,7 +9,9 @@
  *
  * Needs `DATABASE_URL`; `OPENAI_API_KEY` is optional (without it the catalogue is
  * still loaded and lexically searchable, embeddings are skipped). Run the demo
- * seed afterwards (`pnpm db:seed`) to top up the demo slice's detail fields.
+ * seed afterwards (`pnpm db:seed`) to top up the demo slice's detail fields, then
+ * `pnpm --filter @repo/harvester harvest:details` (src/details-main.ts) for the
+ * demo slice's full metadata, amendments and cross-reference graph.
  */
 import { logger } from "@repo/logger";
 import { BisClient } from "@repo/services/bis/client";

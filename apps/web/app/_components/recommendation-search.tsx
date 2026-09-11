@@ -11,6 +11,7 @@ import { Input } from "~/components/ui/input";
 
 type RunOutput = RouterOutputs["recommend"]["run"];
 type Recommendation = RunOutput["results"][number];
+type AlliedStandard = Recommendation["allied"][number];
 type GapWarning = RunOutput["gapWarnings"][number];
 
 type BadgeVariant = "default" | "secondary" | "destructive" | "outline";
@@ -42,6 +43,14 @@ const ROLE: Record<NonNullable<Recommendation["role"]>, string> = {
   TERMINOLOGY: "Terminology",
   INSTALLATION: "Installation",
   RELATED: "Related",
+};
+
+const ALLIED_ROLE: Record<AlliedStandard["role"], string> = {
+  NORMATIVE_REFERENCE: "Normative reference",
+  TEST_METHOD: "Test method",
+  SAFETY: "Safety",
+  TERMINOLOGY: "Terminology",
+  INSTALLATION: "Installation",
 };
 
 const GAP_WARNING: Record<GapWarning["kind"], string> = {
@@ -123,6 +132,34 @@ function GapWarnings({ warnings }: { warnings: GapWarning[] }) {
   );
 }
 
+function AlliedStandards({ allied }: { allied: AlliedStandard[] }) {
+  if (allied.length === 0) return null;
+
+  return (
+    <div className="border-muted mt-1 flex flex-col gap-1.5 border-l-2 pl-3">
+      <h3 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+        Allied standards
+      </h3>
+      <ul className="flex flex-col gap-1.5">
+        {allied.map((ally) => (
+          <li key={`${ally.relation}:${ally.number}`} className="text-xs">
+            <span className="font-mono text-foreground">{ally.number}</span>
+            <Badge variant="outline" className="mx-2 align-middle">
+              {ALLIED_ROLE[ally.role]}
+            </Badge>
+            {ally.lifecycleStatus === "WITHDRAWN" && (
+              <Badge variant="destructive" className="mr-2 align-middle">
+                Withdrawn
+              </Badge>
+            )}
+            <span className="text-muted-foreground">{ally.title}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function DraftClause({ clause }: { clause: string }) {
   return (
     <section className="flex flex-col gap-2 rounded-lg border p-4">
@@ -151,8 +188,9 @@ export function RecommendationSearch() {
           Describe what you are procuring. Each result shows its lifecycle status and an
           independently checked regulatory badge — whether BIS certification is legally
           mandatory under a Quality Control Order, or the standard is a voluntary benchmark —
-          plus the reasoning, the phrases from your input that triggered it, warnings about
-          your draft, and ready-to-paste clause language.
+          plus the allied standards it depends on tagged by role, the reasoning, the phrases
+          from your input that triggered it, warnings about your draft, and ready-to-paste
+          clause language.
         </p>
       </header>
 
@@ -233,6 +271,7 @@ export function RecommendationSearch() {
                   </p>
                 )}
                 <QcoCitationLine result={result} />
+                <AlliedStandards allied={result.allied} />
               </article>
             ))}
 
