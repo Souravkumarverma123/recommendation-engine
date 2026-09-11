@@ -386,6 +386,7 @@ export function RecommendationSearch() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounter = useRef(0);
+  const fileRequestId = useRef(0);
 
   const lastMsg = messages.length > 0 ? messages[messages.length - 1] : undefined;
   const shouldQuery = lastMsg?.role === "user";
@@ -427,6 +428,12 @@ export function RecommendationSearch() {
   }, [recommend.isSuccess, recommend.data]);
 
   const handleFile = useCallback(async (file: File) => {
+    // Stamp this call so a slower, superseded extraction (an earlier file
+    // pick, or one still running after the attachment was removed) can
+    // detect it's stale and skip writing over newer state.
+    const requestId = ++fileRequestId.current;
+    const isStale = () => requestId !== fileRequestId.current;
+
     const kind = isSupportedAttachment(file);
     if (!kind) {
       setFileState({
@@ -441,6 +448,7 @@ export function RecommendationSearch() {
     try {
       if (kind === "pdf") {
         const { text, pageCount, truncated } = await extractPdfText(file);
+        if (isStale()) return;
         if (!text) {
           setFileState({
             status: "error",
@@ -452,15 +460,29 @@ export function RecommendationSearch() {
         setFileState({ status: "ready", name: file.name, text, pageCount, truncated });
       } else {
         const raw = await file.text();
+        if (isStale()) return;
         const text = raw.trim().slice(0, MAX_SPEC_CHARS);
         setFileState({ status: "ready", name: file.name, text, pageCount: 1, truncated: raw.trim().length > MAX_SPEC_CHARS });
       }
     } catch {
-      setFileState({ status: "error", name: file.name, message: "Couldn't read this file." });
+      if (!isStale()) {
+        setFileState({ status: "error", name: file.name, message: "Couldn't read this file." });
+      }
     }
   }, []);
 
+  const handleRemoveFile = useCallback(() => {
+    fileRequestId.current += 1;
+    setFileState({ status: "idle" });
+  }, []);
+
   function handleSubmit() {
+    // Block re-entrant submits (e.g. Enter spammed while a query is in
+    // flight) — otherwise multiple user messages can queue up while the
+    // single `recommend.run` query is only ever keyed off the latest one,
+    // silently orphaning earlier messages.
+    if (recommend.isFetching) return;
+
     const text = input.trim();
     const hasFile = fileState.status === "ready";
     if (!text && !hasFile) return;
@@ -482,7 +504,7 @@ export function RecommendationSearch() {
       },
     ]);
     setInput("");
-    setFileState({ status: "idle" });
+    handleRemoveFile();
     if (textareaRef.current) textareaRef.current.style.height = "auto";
   }
 
@@ -532,7 +554,7 @@ export function RecommendationSearch() {
         if (f) void handleFile(f);
         e.target.value = "";
       }}
-      onRemoveFile={() => setFileState({ status: "idle" })}
+      onRemoveFile={handleRemoveFile}
       onSubmit={handleSubmit}
       isLoading={isLoading}
       isDragActive={isDragActive}
