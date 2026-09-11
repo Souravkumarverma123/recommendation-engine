@@ -14,11 +14,16 @@ import type { BisDetail } from "@repo/services/bis/model";
 
 import { toDateString } from "./map-list-item";
 
-/** Parse a small integer that BIS sends as a zero-padded string ("04", "06"). */
+/**
+ * Parse a small integer that BIS sends as a zero-padded string ("04", "06").
+ * The whole trimmed value must be digits — `parseInt` alone would happily read
+ * a leading number out of garbled upstream data ("04abc") and turn it into an
+ * authoritative count, which is worse than having none.
+ */
 function toInt(value: string | null | undefined): number | null {
   if (value == null) return null;
-  const n = Number.parseInt(value.trim(), 10);
-  return Number.isFinite(n) ? n : null;
+  const trimmed = value.trim();
+  return /^\d+$/.test(trimmed) ? Number.parseInt(trimmed, 10) : null;
 }
 
 function trimToNull(value: string | null | undefined): string | null {

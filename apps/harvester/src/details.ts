@@ -25,7 +25,7 @@
  * counts (docs/PRD.md §Testing Decisions — the harvester is verified by
  * asserting what lands, not by mocking HTTP).
  */
-import { db, eq, inArray, sql } from "@repo/database";
+import { and, db, eq, inArray, notInArray, sql } from "@repo/database";
 import {
   amendmentsTable,
   standardEdgesTable,
@@ -74,15 +74,22 @@ export interface HarvestDetailsResult {
 
 const DEFAULT_MAX_REVERSE_EDGES = 50;
 
+/** Demo designation → its normalised key, in file order (no duplicates). */
+function demoSliceEntries(): { number: string; key: string }[] {
+  const seen = new Set<string>();
+  const entries: { number: string; key: string }[] = [];
+  for (const s of DEMO_STANDARDS) {
+    const key = parseDesignation(s.number)?.key;
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    entries.push({ number: s.number, key });
+  }
+  return entries;
+}
+
 /** The demo slice as a set of normalised designation keys. */
 export function demoSliceKeys(): string[] {
-  return [
-    ...new Set(
-      DEMO_STANDARDS.map((s) => parseDesignation(s.number)?.key).filter(
-        (k): k is string => Boolean(k),
-      ),
-    ),
-  ];
+  return demoSliceEntries().map((e) => e.key);
 }
 
 interface Target {
@@ -90,6 +97,37 @@ interface Target {
   bisStandardId: number;
   bisEncId: string | null;
   number: string;
+  numberNormalized: string;
+  editionYear: number | null;
+}
+
+/**
+ * A normalised key can match more than one `standards` row — an older edition
+ * a full catalogue harvest also picked up, a part, an English/Hindi pair. Pick
+ * exactly one per key so "enrich the demo slice" cannot spill onto an
+ * unrelated edition: the row whose designation matches `preferredNumberByKey`
+ * exactly, else the newest edition sharing the key.
+ */
+function pickOnePerKey(
+  rows: Target[],
+  preferredNumberByKey: ReadonlyMap<string, string>,
+): Target[] {
+  const byKey = new Map<string, Target[]>();
+  for (const row of rows) {
+    const bucket = byKey.get(row.numberNormalized) ?? [];
+    bucket.push(row);
+    byKey.set(row.numberNormalized, bucket);
+  }
+
+  const picked: Target[] = [];
+  for (const [key, group] of byKey) {
+    const preferred = preferredNumberByKey.get(key);
+    const exact = preferred ? group.find((r) => r.number === preferred) : undefined;
+    picked.push(
+      exact ?? [...group].sort((a, b) => (b.editionYear ?? 0) - (a.editionYear ?? 0))[0]!,
+    );
+  }
+  return picked;
 }
 
 export async function harvestDetails(
@@ -97,7 +135,15 @@ export async function harvestDetails(
 ): Promise<HarvestDetailsResult> {
   const log = options.logger ?? console;
   const maxReverse = options.maxReverseEdges ?? DEFAULT_MAX_REVERSE_EDGES;
-  const targetKeys = options.targetKeys ?? demoSliceKeys();
+  // The demo slice's own canonical designations, so the default run resolves
+  // each key to exactly the row the demo file names — never a different
+  // edition or a Hindi/English sibling that happens to share the key. A
+  // caller passing an explicit `targetKeys` (the seam test) has no such
+  // preference to offer; ties there fall back to the newest edition.
+  const preferredNumberByKey = options.targetKeys
+    ? new Map<string, string>()
+    : new Map(demoSliceEntries().map((e) => [e.key, e.number]));
+  const targetKeys = options.targetKeys ?? [...preferredNumberByKey.keys()];
 
   const result: HarvestDetailsResult = {
     standardsEnriched: 0,
@@ -108,15 +154,18 @@ export async function harvestDetails(
   };
 
   await withHarvestRun("details", async () => {
-    const targets: Target[] = await db
+    const rows: Target[] = await db
       .select({
         id: standardsTable.id,
         bisStandardId: standardsTable.bisStandardId,
         bisEncId: standardsTable.bisEncId,
         number: standardsTable.number,
+        numberNormalized: standardsTable.numberNormalized,
+        editionYear: standardsTable.editionYear,
       })
       .from(standardsTable)
       .where(inArray(standardsTable.numberNormalized, targetKeys));
+    const targets = pickOnePerKey(rows, preferredNumberByKey);
 
     for (const target of targets) {
       if (!target.bisEncId) {
@@ -161,22 +210,34 @@ export async function harvestDetails(
   return result;
 }
 
+/** A whole-digits year string ("2021"), or null for anything else (blank, garbled). */
+function toYear(value: string | null | undefined): number | null {
+  const trimmed = value?.trim();
+  return trimmed && /^\d+$/.test(trimmed) ? Number.parseInt(trimmed, 10) : null;
+}
+
+/**
+ * Upsert every amendment the current response lists, then remove any
+ * `amendments` row for this standard that the response no longer lists — a
+ * corrected or shortened BIS response must not leave a withdrawn amendment (or
+ * its stale PDF link) behind (docs/PRD.md §Testing Decisions — the harvester
+ * reconciles to what the source says now, not what it said last time).
+ */
 async function upsertAmendments(
   target: Target,
   amendments: BisAmendment[],
 ): Promise<number> {
   let n = 0;
+  const keepNos = new Set<number>();
   for (const amendment of amendments) {
-    const parsedYear = amendment.amendmentYear
-      ? Number.parseInt(amendment.amendmentYear, 10)
-      : null;
+    keepNos.add(amendment.noOfAmendment);
     await db
       .insert(amendmentsTable)
       .values({
         standardId: target.id,
         bisStandardId: target.bisStandardId,
         amendmentNo: amendment.noOfAmendment,
-        year: parsedYear != null && Number.isFinite(parsedYear) ? parsedYear : null,
+        year: toYear(amendment.amendmentYear),
         label: amendment.amendmentLabel?.trim() ?? null,
         pdfKey: amendment.is_documents?.trim() ?? null,
       })
@@ -194,6 +255,18 @@ async function upsertAmendments(
       });
     n += 1;
   }
+
+  await db
+    .delete(amendmentsTable)
+    .where(
+      and(
+        eq(amendmentsTable.standardId, target.id),
+        keepNos.size > 0
+          ? notInArray(amendmentsTable.amendmentNo, [...keepNos])
+          : sql`true`,
+      ),
+    );
+
   return n;
 }
 
@@ -202,6 +275,13 @@ async function upsertAmendments(
  * other-Indian, 4 document-number, 5 reverse (docs/research §5). Forward
  * entries become `REFERS_TO` edges, except the international ones which become
  * `EQUIVALENT_TO`; the reverse list becomes `REFERENCED_BY`.
+ *
+ * The forward edges (`REFERS_TO` / `EQUIVALENT_TO`) are reconciled to exactly
+ * what this response lists — a reference BIS has since removed is deleted, not
+ * left behind to keep showing as an allied standard. The reverse list is
+ * upsert-only: it is truncated to `maxReverseEdges` before it ever reaches
+ * here, so an entry missing from one run's top-N is not evidence BIS removed
+ * it, and `allied()` never reads `REFERENCED_BY` anyway.
  */
 async function ingestCrossRefs(
   target: Target,
@@ -210,10 +290,12 @@ async function ingestCrossRefs(
 ): Promise<{ companions: number; edges: number }> {
   let companions = 0;
   let edges = 0;
+  const keepForwardRaw = new Set<string>();
 
   for (const ref of forward) {
     const raw = ref.standardNumber.trim();
     const props = { isType: ref.isType ?? null, typeLabel: ref.typeLabel ?? null };
+    keepForwardRaw.add(raw);
 
     // International references (ISO/IEC/…) — `parseDesignation` deliberately
     // rejects a non-IS series, so store the raw designation and do not resolve.
@@ -247,12 +329,24 @@ async function ingestCrossRefs(
     });
   }
 
+  await db
+    .delete(standardEdgesTable)
+    .where(
+      and(
+        eq(standardEdgesTable.srcStandardId, target.id),
+        inArray(standardEdgesTable.type, ["REFERS_TO", "EQUIVALENT_TO"]),
+        keepForwardRaw.size > 0
+          ? notInArray(standardEdgesTable.dstNumberRaw, [...keepForwardRaw])
+          : sql`true`,
+      ),
+    );
+
   for (const ref of reverse) {
     const parsed = parseDesignation(ref.standardNumber);
     if (!parsed) continue;
     edges += await upsertEdge({
       srcStandardId: target.id,
-      dstStandardId: await resolveExisting(parsed.key),
+      dstStandardId: await resolveExisting(parsed.key, ref.standardNumber.trim()),
       dstNumberRaw: ref.standardNumber.trim(),
       dstNumberNormalized: parsed.key,
       type: "REFERENCED_BY",
@@ -263,13 +357,27 @@ async function ingestCrossRefs(
   return { companions, edges };
 }
 
-async function resolveExisting(key: string): Promise<string | null> {
-  const [row] = await db
-    .select({ id: standardsTable.id })
+/**
+ * The id of the `standards` row for `key`, or `null` if none exists. When more
+ * than one row shares the key (another edition, a part, an English/Hindi
+ * pair), `preferredNumber` — the exact designation this reference actually
+ * named — wins the tie; otherwise the newest edition does, rather than an
+ * arbitrary row off an unordered query.
+ */
+async function resolveExisting(
+  key: string,
+  preferredNumber?: string,
+): Promise<string | null> {
+  const rows = await db
+    .select({ id: standardsTable.id, number: standardsTable.number, editionYear: standardsTable.editionYear })
     .from(standardsTable)
-    .where(eq(standardsTable.numberNormalized, key))
-    .limit(1);
-  return row?.id ?? null;
+    .where(eq(standardsTable.numberNormalized, key));
+  if (rows.length === 0) return null;
+
+  const exact = preferredNumber ? rows.find((r) => r.number === preferredNumber) : undefined;
+  return (
+    exact ?? [...rows].sort((a, b) => (b.editionYear ?? 0) - (a.editionYear ?? 0))[0]!
+  ).id;
 }
 
 async function resolveOrIngestCompanion(
@@ -278,7 +386,7 @@ async function resolveOrIngestCompanion(
   series: string,
   year: number | null,
 ): Promise<{ id: string | null; ingested: boolean }> {
-  const existing = await resolveExisting(key);
+  const existing = await resolveExisting(key, ref.standardNumber.trim());
   if (existing) return { id: existing, ingested: false };
 
   const row: InsertStandard = {
@@ -299,7 +407,7 @@ async function resolveOrIngestCompanion(
 
   if (inserted) return { id: inserted.id, ingested: true };
   // A bisStandardId clash with an unrelated row — fall back to the key lookup.
-  return { id: await resolveExisting(key), ingested: false };
+  return { id: await resolveExisting(key, ref.standardNumber.trim()), ingested: false };
 }
 
 async function upsertEdge(edge: {

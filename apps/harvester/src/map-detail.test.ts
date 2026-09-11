@@ -81,6 +81,14 @@ describe("mapDetail", () => {
     ).toBeNull();
   });
 
+  it("rejects a garbled count rather than parsing its leading digits", () => {
+    const fields = mapDetail(
+      bisDetailSchema.parse({ standardNumber: "IS 1", noOfRevision: "04abc", noOfAmendment: "" }),
+    );
+    expect(fields.revisionCount).toBeNull();
+    expect(fields.amendmentCount).toBeNull();
+  });
+
   it("reads a withdrawn standard's supersession pointer and date", () => {
     const fields = mapDetail(
       bisDetailSchema.parse({
