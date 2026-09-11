@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { citesOnlyCandidates, traceToCandidate, verbatimExcerpts } from "./verify";
+import {
+  citesOnlyCandidates,
+  DESIGNATION_IN_PROSE_RE,
+  traceToCandidate,
+  verbatimExcerpts,
+} from "./verify";
 
 /**
  * Pure-logic tests for the post-hoc verification helpers (docs/PRD.md §Pipeline
@@ -80,5 +85,17 @@ describe("citesOnlyCandidates — free prose must not name an unlisted standard"
     expect(
       citesOnlyCandidates("Use IS 1489 (Part 1) : 1991 for the pozzolana cement.", candidates),
     ).toBe(true);
+  });
+});
+
+describe("DESIGNATION_IN_PROSE_RE — matches a designation number in full", () => {
+  it("captures a 6-digit designation number whole, not truncated to 5 digits", () => {
+    const matches = "conforming to IS 123456:2020".match(DESIGNATION_IN_PROSE_RE);
+    expect(matches).toEqual(["IS 123456:2020"]);
+  });
+
+  it("does not truncate-match a 7+ digit run as a bare 6-digit designation", () => {
+    const matches = "IS 1234567 is not a real designation".match(DESIGNATION_IN_PROSE_RE);
+    expect(matches).toBeNull();
   });
 });

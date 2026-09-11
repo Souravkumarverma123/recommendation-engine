@@ -77,6 +77,24 @@ function formatDate(iso: string): string {
   });
 }
 
+function VersionNote({ result }: { result: Recommendation }) {
+  if (result.supersedes.length === 0 && !result.concurrentWith) return null;
+
+  return (
+    <p className="text-muted-foreground text-xs">
+      {result.supersedes.length > 0 && (
+        <>Supersedes {result.supersedes.join(", ")} — cite this edition instead.</>
+      )}
+      {result.concurrentWith && (
+        <span className="block">
+          {result.concurrentWith.number} remains concurrently valid until{" "}
+          {formatDate(result.concurrentWith.validUntil)}.
+        </span>
+      )}
+    </p>
+  );
+}
+
 function QcoCitationLine({ result }: { result: Recommendation }) {
   const { qco, qcoNote } = result;
   if (!qco) return null;
@@ -113,8 +131,8 @@ function GapWarnings({ warnings }: { warnings: GapWarning[] }) {
   if (warnings.length === 0) return null;
 
   return (
-    <section className="border-destructive/40 bg-destructive/5 flex flex-col gap-2 rounded-lg border p-4">
-      <h2 className="text-sm font-medium">Check your draft specification</h2>
+    <section className="border-destructive/40 bg-destructive/5 flex flex-col gap-2 rounded-lg border p-6">
+      <h2 className="text-[16px] font-semibold text-ink">Check your draft specification</h2>
       <ul className="flex flex-col gap-2">
         {warnings.map((warning, i) => (
           <li key={i} className="text-sm">
@@ -162,9 +180,11 @@ function AlliedStandards({ allied }: { allied: AlliedStandard[] }) {
 
 function DraftClause({ clause }: { clause: string }) {
   return (
-    <section className="flex flex-col gap-2 rounded-lg border p-4">
-      <h2 className="text-sm font-medium">Draft tender clause</h2>
-      <p className="text-muted-foreground bg-muted/50 rounded-md p-3 text-sm">{clause}</p>
+    <section className="bg-surface-card flex flex-col gap-2 rounded-lg border border-hairline p-6">
+      <h2 className="text-[16px] font-semibold text-ink">Draft tender clause</h2>
+      <p className="text-body bg-canvas-soft rounded-md p-3 font-mono text-[13px] leading-[1.5]">
+        {clause}
+      </p>
     </section>
   );
 }
@@ -179,12 +199,12 @@ export function RecommendationSearch() {
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-16">
-      <header className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-16 sm:py-20">
+      <header className="flex flex-col gap-3">
+        <h1 className="text-[26px] font-normal leading-[1.25] tracking-[-0.325px] text-ink">
           Indian Standards Recommendation Engine
         </h1>
-        <p className="text-muted-foreground text-sm">
+        <p className="text-body text-sm leading-[1.5]">
           Describe what you are procuring. Each result shows its lifecycle status and an
           independently checked regulatory badge — whether BIS certification is legally
           mandatory under a Quality Control Order, or the standard is a voluntary benchmark —
@@ -208,8 +228,13 @@ export function RecommendationSearch() {
           placeholder="e.g. 500 ergonomic office chairs for a government secretariat"
           aria-label="Procurement requirement"
           autoComplete="off"
+          className="bg-surface-card h-11 rounded-md"
         />
-        <Button type="submit" disabled={draft.trim().length === 0}>
+        <Button
+          type="submit"
+          disabled={draft.trim().length === 0}
+          className="hover:bg-primary-active h-11 rounded-md px-5"
+        >
           Recommend
         </Button>
       </form>
@@ -243,7 +268,7 @@ export function RecommendationSearch() {
             {recommend.data.results.map((result) => (
               <article
                 key={result.number}
-                className="flex flex-col gap-2 rounded-lg border p-4"
+                className="bg-surface-card flex flex-col gap-2 rounded-lg border border-hairline p-6"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-mono text-sm font-medium">{result.number}</span>
@@ -256,6 +281,7 @@ export function RecommendationSearch() {
                   </div>
                 </div>
                 <p className="text-sm">{result.title}</p>
+                <VersionNote result={result} />
                 {result.reason && (
                   <p className="text-muted-foreground text-sm">{result.reason}</p>
                 )}

@@ -289,3 +289,56 @@ describe("recommend.run — allied standards (ticket #11)", () => {
     expect(ppc?.allied).toEqual([]);
   });
 });
+
+describe("recommend.run — supersession resolution (ticket #12, scenario 3)", () => {
+  it('"OPC 43 grade to IS 8112" resolves to IS 269:2015, MANDATORY, with a superseded warning naming IS 8112', async () => {
+    const output = await recommend.run({ specText: "OPC 43 grade to IS 8112" });
+
+    const current = resultFor(output, "IS 269:2015");
+    expect(current).toBeDefined();
+    expect(current?.regulatoryStatus).toBe("MANDATORY");
+    expect(current?.supersedes).toContain("IS 8112:2013");
+
+    // The dead citation itself must not survive as a separate result.
+    expect(resultFor(output, "IS 8112:2013")).toBeUndefined();
+
+    const warning = output.gapWarnings.find(
+      (w) => w.kind === "SUPERSEDED_CITATION" && w.evidence === "IS 8112",
+    );
+    expect(warning).toBeDefined();
+    expect(warning?.message).toMatch(/IS 269:2015/);
+  });
+
+  it("resolves a second grade-wise citation (IS 12269) to the same current edition", async () => {
+    const output = await recommend.run({
+      specText: "OPC 53 grade cement to IS 12269 for the foundation works",
+    });
+
+    const current = resultFor(output, "IS 269:2015");
+    expect(current).toBeDefined();
+    expect(current?.supersedes).toContain("IS 12269:2013");
+    expect(resultFor(output, "IS 12269:2013")).toBeUndefined();
+  });
+
+  it("does not warn about supersession when the officer already cited the current edition", async () => {
+    const output = await recommend.run({ specText: "RCC structural work per IS 456" });
+    expect(output.gapWarnings.some((w) => w.kind === "SUPERSEDED_CITATION")).toBe(false);
+  });
+
+  it("still resolves the current edition when the reasoner is disabled", async () => {
+    const bare = new RecommendService({
+      standards: new StandardsService({ embeddings: fakeEmbeddingProvider }),
+      qco: new QcoService(),
+      reasoner: null,
+    });
+
+    const output = await bare.run({ specText: "OPC 43 grade to IS 8112" });
+
+    expect(output.reasoned).toBe(false);
+    const current = resultFor(output, "IS 269:2015");
+    expect(current).toBeDefined();
+    expect(current?.supersedes).toContain("IS 8112:2013");
+    const warning = output.gapWarnings.find((w) => w.kind === "SUPERSEDED_CITATION");
+    expect(warning?.evidence).toBe("IS 8112");
+  });
+});

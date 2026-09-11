@@ -1,11 +1,16 @@
 /**
  * The recommendation pipeline (docs/PRD.md §The recommendation pipeline).
  *
- * Today: hybrid retrieval → independent QCO check per candidate → LLM reasoning
- * (ranking, role classification, evidence, gap warnings, draft clause) →
- * post-hoc verification → assembled response. Version resolution (step 7)
- * lands in a later ticket behind this same `run()` method and its frozen
- * contract.
+ * Today: hybrid retrieval → version resolution → independent QCO check per
+ * candidate → LLM reasoning (ranking, role classification, evidence, gap
+ * warnings, draft clause) → post-hoc verification → assembled response.
+ *
+ * Version resolution runs first, ahead of the QCO check and the reasoner
+ * (docs/PRD.md §Pipeline step 7, user stories 7-10, ticket #12): a withdrawn
+ * hit is swapped for the catalogue edition that actually applies today
+ * *before* anything downstream reads its regulatory status or hands it to the
+ * model, so "OPC 43 grade to IS 8112" is checked and reasoned about as
+ * IS 269:2015, not the dead citation.
  *
  * The regulatory badge on each result comes only from `QcoService.checkStatus`,
  * which queries the obligation data directly — neither the retrieval score nor
@@ -19,6 +24,8 @@ import { standardsTable } from "@repo/database/schema";
 
 import { qcoService, QcoService } from "../qco";
 import { standardsService, StandardsService } from "../standards";
+import type { StandardSearchHit } from "../standards/model";
+import type { VersionResolution } from "../standards/version";
 import {
   recommendRunInputSchema,
   type RecommendedStandard,
@@ -32,6 +39,7 @@ import {
   type ReasonerCandidate,
   type ReasonedStandard,
 } from "./reasoner";
+import { mergeGapWarnings, supersessionWarnings } from "./supersession";
 import { citesOnlyCandidates, traceToCandidate, verbatimExcerpts } from "./verify";
 
 export interface RecommendServiceDeps {
@@ -75,9 +83,11 @@ export class RecommendService {
     const { specText, language, limit } = recommendRunInputSchema.parse(input);
 
     const { results: hits } = await this.standards.search({ query: specText, limit });
+    const { hits: resolvedHits, supersedesByNumber, concurrentByNumber } =
+      await this.resolveHitVersions(hits);
 
     const checked: CheckedCandidate[] = await Promise.all(
-      hits.map(async (hit) => {
+      resolvedHits.map(async (hit) => {
         const check = await this.qco.checkStatus({
           isNumber: hit.number,
           productText: specText,
@@ -87,11 +97,16 @@ export class RecommendService {
           regulatoryStatus: check.status,
           qco: check.qco,
           qcoNote: check.note,
+          supersedes: supersedesByNumber.get(hit.number) ?? [],
+          concurrentWith: concurrentByNumber.get(hit.number) ?? null,
         };
       }),
     );
 
     const reasoning = await this.reason(specText, language, checked);
+    // Authoritative, independent of the reasoning step — drawn from `isStatus` /
+    // `superseded_byis`, never guessed by the model (docs/PRD.md §Architecture).
+    const versionWarnings = supersessionWarnings(checked, specText);
 
     if (!reasoning) {
       return {
@@ -100,7 +115,7 @@ export class RecommendService {
         results: await this.attachAllied(checked.map(unreasoned)),
         reasoned: false,
         requirementSummary: null,
-        gapWarnings: [],
+        gapWarnings: versionWarnings,
         draftClause: null,
       };
     }
@@ -115,13 +130,18 @@ export class RecommendService {
       requirementSummary: reasoning.requirementSummary,
       // Gap-warning evidence is subject to the same "must be from the input"
       // rule as per-standard evidence — null it out if the model did not quote.
-      gapWarnings: reasoning.gapWarnings.map((warning) => ({
-        ...warning,
-        evidence:
-          warning.evidence && verbatimExcerpts([warning.evidence], specText).length > 0
-            ? warning.evidence
-            : null,
-      })),
+      // The deterministic version-resolution warnings always take the slot over
+      // a model-proposed duplicate for the same citation (mergeGapWarnings).
+      gapWarnings: mergeGapWarnings(
+        versionWarnings,
+        reasoning.gapWarnings.map((warning) => ({
+          ...warning,
+          evidence:
+            warning.evidence && verbatimExcerpts([warning.evidence], specText).length > 0
+              ? warning.evidence
+              : null,
+        })),
+      ),
       // The clause is paste-into-a-tender prose and is not covered by the
       // ranked-number schema constraint — drop it entirely if it names any
       // standard outside the retrieved candidate set (docs/PRD.md user story 27).
@@ -129,6 +149,74 @@ export class RecommendService {
         ? reasoning.draftClause
         : null,
     };
+  }
+
+  /**
+   * Resolve each retrieved hit to its current edition (docs/PRD.md §Pipeline
+   * step 7). Runs before the QCO check and the reasoner see the hits, so a
+   * withdrawn citation is checked and reasoned about as the standard that
+   * actually applies today. Two hits that resolve to the same current edition
+   * (a withdrawn one and its already-current successor both matching
+   * retrieval) are merged, keeping the better retrieval score. A resolution
+   * failure degrades to the hits as retrieved — the ranked list matters more
+   * than the version note.
+   */
+  private async resolveHitVersions(hits: StandardSearchHit[]): Promise<{
+    hits: StandardSearchHit[];
+    supersedesByNumber: Map<string, string[]>;
+    concurrentByNumber: Map<string, NonNullable<RecommendedStandard["concurrentWith"]>>;
+  }> {
+    const supersedesByNumber = new Map<string, string[]>();
+    const concurrentByNumber = new Map<
+      string,
+      NonNullable<RecommendedStandard["concurrentWith"]>
+    >();
+
+    let versions: Map<string, VersionResolution>;
+    try {
+      versions = await this.standards.resolveVersions(hits.map((h) => h.number));
+    } catch (error) {
+      console.error(
+        "recommend.run: version resolution failed, keeping retrieved editions as-is —",
+        error instanceof Error ? error.message : String(error),
+      );
+      return { hits, supersedesByNumber, concurrentByNumber };
+    }
+
+    const merged = new Map<string, StandardSearchHit>();
+    for (const hit of hits) {
+      const resolution = versions.get(hit.number);
+      const target: StandardSearchHit = resolution
+        ? {
+            number: resolution.current.number,
+            title: resolution.current.title,
+            isStatus: resolution.current.isStatus,
+            lifecycleStatus: resolution.current.lifecycleStatus,
+            score: hit.score,
+          }
+        : hit;
+
+      const existing = merged.get(target.number);
+      merged.set(target.number, {
+        ...target,
+        score: Math.max(existing?.score ?? -Infinity, target.score),
+      });
+
+      if (resolution && resolution.supersedes.length > 0) {
+        const acc = supersedesByNumber.get(resolution.current.number) ?? [];
+        supersedesByNumber.set(resolution.current.number, [
+          ...new Set([...acc, ...resolution.supersedes]),
+        ]);
+      }
+      // First hit to report a concurrent companion for a given current edition
+      // wins the slot — deterministic by retrieval order rather than silently
+      // overwritten by whichever hit happens to be processed last.
+      if (resolution?.concurrentWith && !concurrentByNumber.has(resolution.current.number)) {
+        concurrentByNumber.set(resolution.current.number, resolution.concurrentWith);
+      }
+    }
+
+    return { hits: [...merged.values()], supersedesByNumber, concurrentByNumber };
   }
 
   /** Run the reasoner, degrading to `null` (retrieval-only) on any failure. */

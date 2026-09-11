@@ -58,6 +58,21 @@ export const recommendedStandardSchema = standardSearchHitSchema.extend({
    * the demo slice).
    */
   allied: z.array(alliedStandardSchema),
+  /**
+   * Withdrawn designations this result stands in for — the officer may have
+   * cited one of these; version resolution (ticket #12) walked `isStatus` /
+   * `superseded_byis` to the edition that actually applies today. Empty when
+   * this result needed no resolution.
+   */
+  supersedes: z.array(z.string()),
+  /**
+   * An earlier edition still valid alongside this one, with the date its own
+   * validity ends — set only when BIS lists both as concurrently running
+   * (docs/PRD.md user story 10). `null` otherwise.
+   */
+  concurrentWith: z
+    .object({ number: z.string(), title: z.string(), validUntil: z.string() })
+    .nullable(),
 });
 export type RecommendedStandard = z.infer<typeof recommendedStandardSchema>;
 
