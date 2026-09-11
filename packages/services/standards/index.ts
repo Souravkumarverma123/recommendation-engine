@@ -273,12 +273,14 @@ export class StandardsService {
    * the requested designations (scoped by `where number_normalized in (...)`,
    * the same shape `allied()` uses); each further round fetches only the
    * `supersededByRaw` targets the previous round's withdrawn rows introduced
-   * and this call hasn't already fetched, capped at {@link MAX_CHAIN_HOPS}
-   * rounds — the same ceiling {@link resolveVersion}'s own walk respects. A
-   * real BIS chain is one or two hops, so this is a handful of small, indexed
-   * queries rather than one scan of the whole catalogue. The walk itself is the
-   * pure {@link resolveVersion}. Results are keyed by the exact designation
-   * passed in; a designation the index has no row for is absent from the map.
+   * and this call hasn't already fetched, for up to {@link MAX_CHAIN_HOPS}
+   * further rounds after round 0 — the same number of transitions
+   * {@link resolveVersion}'s own walk can make, so a chain using every hop it
+   * allows still has its final successor's row fetched. A real BIS chain is
+   * one or two hops, so this is a handful of small, indexed queries rather
+   * than one scan of the whole catalogue. The walk itself is the pure
+   * {@link resolveVersion}. Results are keyed by the exact designation passed
+   * in; a designation the index has no row for is absent from the map.
    */
   async resolveVersions(numbers: string[]): Promise<Map<string, VersionResolution>> {
     const wanted = [...new Set(numbers)].filter((n) => n.length > 0);
@@ -292,7 +294,11 @@ export class StandardsService {
         .filter((key): key is string => key != null),
     );
 
-    for (let hop = 0; hop < MAX_CHAIN_HOPS && frontier.size > 0; hop++) {
+    // Round 0 fetches the starting editions; each subsequent round fetches one
+    // more hop of successors. `resolveVersion` can make up to MAX_CHAIN_HOPS
+    // transitions, so MAX_CHAIN_HOPS + 1 rounds are needed to have every row
+    // such a walk could reach already in hand.
+    for (let round = 0; round <= MAX_CHAIN_HOPS && frontier.size > 0; round++) {
       const toFetch = [...frontier].filter((key) => !fetchedKeys.has(key));
       if (toFetch.length === 0) break;
       toFetch.forEach((key) => fetchedKeys.add(key));

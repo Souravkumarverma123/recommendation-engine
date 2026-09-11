@@ -47,6 +47,22 @@ describe("supersessionWarnings", () => {
     expect(warnings.map((w) => w.evidence)).toEqual(["IS 1000", "IS 2000"]);
   });
 
+  it("does not claim a different explicit edition year is the superseded one", () => {
+    const warnings = supersessionWarnings(
+      [{ number: "IS 269:2015", supersedes: ["IS 8112:2013"] }],
+      "OPC 43 grade to IS 8112:1990",
+    );
+    expect(warnings).toEqual([]);
+  });
+
+  it("still matches when the citation gives no year at all", () => {
+    const warnings = supersessionWarnings(
+      [{ number: "IS 269:2015", supersedes: ["IS 8112:2013"] }],
+      "OPC 43 grade to IS 8112",
+    );
+    expect(warnings).toHaveLength(1);
+  });
+
   it("catches a spaced-slash composite series citation, not just the unspaced form", () => {
     const warnings = supersessionWarnings(
       [{ number: "IS/IEC 62368-1:2023", supersedes: ["IS/IEC 60950-1:2013"] }],

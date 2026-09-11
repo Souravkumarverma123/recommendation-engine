@@ -135,7 +135,11 @@ export function resolveVersion(
   let node = start;
 
   for (let hop = 0; hop < MAX_CHAIN_HOPS; hop++) {
-    const key = parseDesignation(node.number)?.key ?? node.number;
+    // Keyed with the edition year: two different editions of the same base
+    // number (e.g. IS 456:2000 superseded by IS 456:2010) are legitimately
+    // different nodes in the chain, not a cycle. Only a reference back to the
+    // exact same edition is one.
+    const key = parseDesignation(node.number)?.keyWithYear ?? node.number;
     if (visitedKeys.has(key)) break;
     visitedKeys.add(key);
 

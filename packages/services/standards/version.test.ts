@@ -106,6 +106,31 @@ describe("resolveVersion", () => {
     expect(resolution?.supersedes).toEqual([]);
   });
 
+  it("follows multiple revisions under the same base number to the latest one, not stopping as a false cycle", () => {
+    const index = new VersionIndex([
+      row({
+        number: "IS 456:2000",
+        title: "second revision",
+        isStatus: 5,
+        supersededByRaw: "IS 456:2010",
+        editionYear: 2000,
+      }),
+      row({
+        number: "IS 456:2010",
+        title: "third revision",
+        isStatus: 5,
+        supersededByRaw: "IS 456:2020",
+        editionYear: 2010,
+      }),
+      row({ number: "IS 456:2020", title: "current revision", isStatus: 2, editionYear: 2020 }),
+    ]);
+
+    const resolution = resolveVersion("IS 456:2000", index);
+
+    expect(resolution?.current.number).toBe("IS 456:2020");
+    expect(resolution?.supersedes).toEqual(["IS 456:2000", "IS 456:2010"]);
+  });
+
   it("breaks a supersession cycle instead of looping forever", () => {
     const index = new VersionIndex([
       row({

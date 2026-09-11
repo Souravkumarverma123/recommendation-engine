@@ -11,23 +11,34 @@
  * Pure — no DB, no network. Exercised through the `recommend.run` seam and
  * directly in supersession.test.ts.
  */
-import { normalizeDesignation, sameStandard } from "../bis/designation";
+import { normalizeDesignation, parseDesignation, sameStandard } from "../bis/designation";
 import type { GapWarning } from "./reasoner";
 import { DESIGNATION_IN_PROSE_RE } from "./verify";
 
 /**
- * The designation-shaped run in `sourceText` that names the same standard as
- * `designation` (edition year ignored, per {@link sameStandard}), or `null` if
- * it was never cited. Reuses the same "find a BIS designation in free prose"
- * primitive as `verify.ts`'s candidate-tracing check, rather than building a
- * bespoke literal-text regex — so a citation in any of the formats
+ * The designation-shaped run in `sourceText` that names the same standard and
+ * edition as `designation`, or `null` if it was never cited. Reuses the same
+ * "find a BIS designation in free prose" primitive as `verify.ts`'s
+ * candidate-tracing check, so a citation in any of the formats
  * `parseDesignation` already tolerates (a part written as "Part 3" or
  * "(Part-3)", a spaced "IS / IEC" series, with or without the edition year)
- * is still caught, not just an exact character-for-character match.
+ * is still caught, not just an exact character-for-character match. A run
+ * only counts as a match when neither side names a year (ambiguous — assume
+ * the same edition) or both name the *same* year: `designation` is the one
+ * specific withdrawn edition version resolution actually confirmed superseded,
+ * so a citation of a different explicit year for the same base number must
+ * not be claimed superseded on its authority.
  */
 function citedIn(designation: string, sourceText: string): string | null {
   const runs = sourceText.match(DESIGNATION_IN_PROSE_RE) ?? [];
-  return runs.find((run) => sameStandard(run, designation)) ?? null;
+  const designationYear = parseDesignation(designation)?.year;
+  return (
+    runs.find((run) => {
+      if (!sameStandard(run, designation)) return false;
+      const runYear = parseDesignation(run)?.year;
+      return runYear == null || designationYear == null || runYear === designationYear;
+    }) ?? null
+  );
 }
 
 export interface SupersessionCandidate {

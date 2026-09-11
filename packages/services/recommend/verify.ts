@@ -70,10 +70,14 @@ export function traceToCandidate<T extends { number: string }>(
  * A BIS-designation-shaped run inside free prose: "IS 456", "IS 1489 (Part 1) : 1991",
  * "IS/IEC 62368-1:2023". Exported for reuse by anything that needs to find a
  * designation cited in officer-written text, not just this module's own
- * candidate-tracing check (e.g. `recommend/supersession.ts`).
+ * candidate-tracing check (e.g. `recommend/supersession.ts`). The number run is
+ * capped at 6 digits with a trailing `(?!\d)` boundary, mirroring
+ * `designation.ts`'s own `NUMBER_RE` — without it, a 6-digit designation (BIS
+ * numbers now run past 17000 and will eventually reach 6 digits) would match
+ * only its first 5 digits instead of failing to match or matching in full.
  */
 export const DESIGNATION_IN_PROSE_RE =
-  /\b(?:IS|SP)(?:\s*\/\s*(?:ISO|IEC))*\s*\d{1,5}(?:\s*\(\s*Part[^)]*\))?(?:\s*:\s*\d{4})?/gi;
+  /\b(?:IS|SP)(?:\s*\/\s*(?:ISO|IEC))*\s*\d{1,6}(?!\d)(?:\s*\(\s*Part[^)]*\))?(?:\s*:\s*\d{4})?/gi;
 
 /**
  * True when every BIS designation named in `prose` traces back to one of
