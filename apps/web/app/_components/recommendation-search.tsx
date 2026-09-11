@@ -9,7 +9,9 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 
-type Recommendation = RouterOutputs["recommend"]["run"]["results"][number];
+type RunOutput = RouterOutputs["recommend"]["run"];
+type Recommendation = RunOutput["results"][number];
+type GapWarning = RunOutput["gapWarnings"][number];
 
 type BadgeVariant = "default" | "secondary" | "destructive" | "outline";
 
@@ -30,6 +32,25 @@ const REGULATORY: Record<
   UPCOMING: { label: "Upcoming QCO", variant: "default" },
   VOLUNTARY: { label: "Voluntary", variant: "secondary" },
   NEEDS_REVIEW: { label: "Needs review", variant: "outline" },
+};
+
+const ROLE: Record<NonNullable<Recommendation["role"]>, string> = {
+  PRIMARY: "Primary standard",
+  NORMATIVE_REFERENCE: "Normative reference",
+  TEST_METHOD: "Test method",
+  SAFETY: "Safety",
+  TERMINOLOGY: "Terminology",
+  INSTALLATION: "Installation",
+  RELATED: "Related",
+};
+
+const GAP_WARNING: Record<GapWarning["kind"], string> = {
+  BRAND_NAME: "Brand name",
+  FOREIGN_STANDARD: "Foreign standard",
+  NON_METRIC_UNIT: "Non-metric unit",
+  SUPERSEDED_CITATION: "Superseded citation",
+  MISSING_PARAMETER: "Missing parameter",
+  OTHER: "Review",
 };
 
 function StatusBadge({ label, variant }: { label: string; variant: BadgeVariant }) {
@@ -79,6 +100,38 @@ function QcoCitationLine({ result }: { result: Recommendation }) {
   );
 }
 
+function GapWarnings({ warnings }: { warnings: GapWarning[] }) {
+  if (warnings.length === 0) return null;
+
+  return (
+    <section className="border-destructive/40 bg-destructive/5 flex flex-col gap-2 rounded-lg border p-4">
+      <h2 className="text-sm font-medium">Check your draft specification</h2>
+      <ul className="flex flex-col gap-2">
+        {warnings.map((warning, i) => (
+          <li key={i} className="text-sm">
+            <Badge variant="outline" className="mr-2 align-middle">
+              {GAP_WARNING[warning.kind]}
+            </Badge>
+            {warning.message}
+            {warning.evidence && (
+              <span className="text-muted-foreground"> — “{warning.evidence}”</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function DraftClause({ clause }: { clause: string }) {
+  return (
+    <section className="flex flex-col gap-2 rounded-lg border p-4">
+      <h2 className="text-sm font-medium">Draft tender clause</h2>
+      <p className="text-muted-foreground bg-muted/50 rounded-md p-3 text-sm">{clause}</p>
+    </section>
+  );
+}
+
 export function RecommendationSearch() {
   const [draft, setDraft] = useState("");
   const [specText, setSpecText] = useState("");
@@ -97,7 +150,9 @@ export function RecommendationSearch() {
         <p className="text-muted-foreground text-sm">
           Describe what you are procuring. Each result shows its lifecycle status and an
           independently checked regulatory badge — whether BIS certification is legally
-          mandatory under a Quality Control Order, or the standard is a voluntary benchmark.
+          mandatory under a Quality Control Order, or the standard is a voluntary benchmark —
+          plus the reasoning, the phrases from your input that triggered it, warnings about
+          your draft, and ready-to-paste clause language.
         </p>
       </header>
 
@@ -136,23 +191,56 @@ export function RecommendationSearch() {
           </p>
         )}
 
-        {recommend.isSuccess &&
-          recommend.data.results.map((result) => (
-            <article
-              key={result.number}
-              className="flex flex-col gap-2 rounded-lg border p-4"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="font-mono text-sm font-medium">{result.number}</span>
-                <div className="flex items-center gap-2">
-                  <StatusBadge {...REGULATORY[result.regulatoryStatus]} />
-                  <StatusBadge {...LIFECYCLE[result.lifecycleStatus]} />
+        {recommend.isSuccess && recommend.data.results.length > 0 && (
+          <>
+            {recommend.data.requirementSummary && (
+              <p className="text-sm">
+                <span className="font-medium">Understood as:</span>{" "}
+                {recommend.data.requirementSummary}
+              </p>
+            )}
+
+            <GapWarnings warnings={recommend.data.gapWarnings} />
+
+            {recommend.data.results.map((result) => (
+              <article
+                key={result.number}
+                className="flex flex-col gap-2 rounded-lg border p-4"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-mono text-sm font-medium">{result.number}</span>
+                  <div className="flex items-center gap-2">
+                    {result.role && (
+                      <Badge variant="outline">{ROLE[result.role]}</Badge>
+                    )}
+                    <StatusBadge {...REGULATORY[result.regulatoryStatus]} />
+                    <StatusBadge {...LIFECYCLE[result.lifecycleStatus]} />
+                  </div>
                 </div>
-              </div>
-              <p className="text-sm">{result.title}</p>
-              <QcoCitationLine result={result} />
-            </article>
-          ))}
+                <p className="text-sm">{result.title}</p>
+                {result.reason && (
+                  <p className="text-muted-foreground text-sm">{result.reason}</p>
+                )}
+                {result.evidence.length > 0 && (
+                  <p className="text-muted-foreground text-xs">
+                    Evidence from your input:{" "}
+                    {result.evidence.map((excerpt, i) => (
+                      <span key={i}>
+                        {i > 0 && ", "}
+                        <span className="text-foreground">“{excerpt}”</span>
+                      </span>
+                    ))}
+                  </p>
+                )}
+                <QcoCitationLine result={result} />
+              </article>
+            ))}
+
+            {recommend.data.draftClause && (
+              <DraftClause clause={recommend.data.draftClause} />
+            )}
+          </>
+        )}
       </section>
     </div>
   );
