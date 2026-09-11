@@ -105,8 +105,13 @@ export const recommendationReasoningSchema = z.object({
   gapWarnings: z.array(gapWarningSchema),
   /** Ready-to-paste tender clause language for the primary standard. */
   draftClause: z.string(),
-  /** Short 2-3 sentence answer in the requested language, directly answering what was asked. */
-  conciseAnswer: z.string(),
+  /**
+   * Short 2-3 sentence answer in the requested language, directly answering
+   * what was asked. Length-bounded (not just prompt-instructed, rule 8) so an
+   * empty or runaway-length response fails schema validation — `reason()`
+   * degrades to retrieval-only rather than rendering it to the officer.
+   */
+  conciseAnswer: z.string().trim().min(1).max(500),
 });
 export type RecommendationReasoning = z.infer<typeof recommendationReasoningSchema>;
 

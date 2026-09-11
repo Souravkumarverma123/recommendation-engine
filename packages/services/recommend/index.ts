@@ -156,12 +156,12 @@ export class RecommendService {
       };
     }
 
+    const assembled = assembleResults(checked, reasoning.rankedStandards, specText);
+
     return {
       query: specText,
       language,
-      results: await this.attachAllied(
-        assembleResults(checked, reasoning.rankedStandards, specText),
-      ),
+      results: await this.attachAllied(assembled),
       reasoned: true,
       requirementSummary: reasoning.requirementSummary,
       // Gap-warning evidence is subject to the same "must be from the input"
@@ -178,15 +178,17 @@ export class RecommendService {
               : null,
         })),
       ),
-      // The clause is paste-into-a-tender prose and is not covered by the
-      // ranked-number schema constraint — drop it entirely if it names any
-      // standard outside the retrieved candidate set (docs/PRD.md user story 27).
-      draftClause: citesOnlyCandidates(reasoning.draftClause, checked)
+      // The clause and the concise answer are free-text prose, not covered by
+      // the ranked-number schema constraint, so each is verified independently
+      // against `assembled` — the standards the reasoner actually kept — not
+      // `checked` (every retrieved candidate). A candidate the reasoner
+      // dropped as inapplicable is exactly what this prose must not name;
+      // checking against the wider retrieval set would let it back in
+      // (docs/PRD.md user story 27).
+      draftClause: citesOnlyCandidates(reasoning.draftClause, assembled)
         ? reasoning.draftClause
         : null,
-      // Same rule as the draft clause: officer-facing prose is not covered by
-      // the ranked-number schema constraint, so verify it independently.
-      conciseAnswer: citesOnlyCandidates(reasoning.conciseAnswer, checked)
+      conciseAnswer: citesOnlyCandidates(reasoning.conciseAnswer, assembled)
         ? reasoning.conciseAnswer
         : null,
     };
