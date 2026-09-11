@@ -337,6 +337,17 @@ export function RecommendationSearch() {
                     </p>
                   )}
 
+                  {msg.data.conciseAnswer && (
+                    <div className="rounded-xl border border-[#dbeafe] bg-[#eff6ff] p-4">
+                      <p className="flex items-start gap-2.5 text-[14px] leading-[1.6] text-gray-800">
+                        <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-[#2563eb]">
+                          <Sparkles className="size-3.5 text-white" />
+                        </span>
+                        <span>{msg.data.conciseAnswer}</span>
+                      </p>
+                    </div>
+                  )}
+
                   {msg.data.draftClause && (
                     <div className="rounded-lg border border-hairline bg-surface-card p-4">
                       <h3 className="mb-2 text-[13px] font-semibold text-ink">

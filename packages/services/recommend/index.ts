@@ -152,6 +152,7 @@ export class RecommendService {
         requirementSummary: null,
         gapWarnings: versionWarnings,
         draftClause: null,
+        conciseAnswer: null,
       };
     }
 
@@ -182,6 +183,11 @@ export class RecommendService {
       // standard outside the retrieved candidate set (docs/PRD.md user story 27).
       draftClause: citesOnlyCandidates(reasoning.draftClause, checked)
         ? reasoning.draftClause
+        : null,
+      // Same rule as the draft clause: officer-facing prose is not covered by
+      // the ranked-number schema constraint, so verify it independently.
+      conciseAnswer: citesOnlyCandidates(reasoning.conciseAnswer, checked)
+        ? reasoning.conciseAnswer
         : null,
     };
   }
@@ -357,9 +363,13 @@ export class RecommendService {
 
 /**
  * Merge the retrieved+checked candidates with the reasoning step's ranking.
- * Order follows the model's ranking for the standards it ranked *and* that
- * survive verification; candidates it did not rank are appended in retrieval
- * order so their independent regulatory badge is never lost.
+ * Only candidates the reasoner actually ranked as applicable — and that
+ * survive verification — are returned, in the model's ranked order. The
+ * reasoner is explicitly instructed to omit candidates that do not directly
+ * answer the requirement (`reasoner.ts` rule 2); a candidate it left out is
+ * retrieval noise (e.g. a broad lexical-fallback match) rather than something
+ * the officer asked about, so it is dropped here instead of being
+ * re-appended with an empty role.
  */
 function assembleResults(
   checked: CheckedCandidate[],
@@ -386,11 +396,6 @@ function assembleResults(
       reason: entry.reason,
       evidence: verbatimExcerpts(entry.evidence, specText),
     });
-  }
-
-  for (const candidate of checked) {
-    if (used.has(candidate.number)) continue;
-    results.push(unreasoned(candidate));
   }
 
   return results;

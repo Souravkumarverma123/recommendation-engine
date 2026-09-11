@@ -85,9 +85,10 @@ export const recommendRunOutputSchema = z.object({
   query: z.string(),
   language: z.enum(["en", "hi"]),
   /**
-   * Ranked by the reasoning step when it ran; otherwise in retrieval order.
-   * Candidates the reasoner did not rank are still included, after the ranked
-   * ones, so their independent regulatory badge is not lost.
+   * Ranked by the reasoning step when it ran, limited to the candidates it
+   * judged applicable to the requirement — a candidate it left unranked is
+   * retrieval noise, not a match, and is dropped rather than shown with an
+   * empty role. In retrieval order, unfiltered, when reasoning did not run.
    */
   results: z.array(recommendedStandardSchema),
   /** Whether the LLM reasoning layer ran. `false` → the fields below are empty. */
@@ -98,5 +99,7 @@ export const recommendRunOutputSchema = z.object({
   gapWarnings: z.array(gapWarningSchema),
   /** Ready-to-paste tender clause language for the primary standard; null when unreasoned. */
   draftClause: z.string().nullable(),
+  /** Short 2-3 sentence answer directly addressing what was asked; null when unreasoned. */
+  conciseAnswer: z.string().nullable(),
 });
 export type RecommendRunOutput = z.infer<typeof recommendRunOutputSchema>;
