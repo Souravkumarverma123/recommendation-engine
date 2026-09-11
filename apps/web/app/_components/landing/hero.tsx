@@ -83,8 +83,8 @@ function ProductPreview() {
               <span className="font-mono text-[13px] font-semibold text-ink">
                 IS 17631:2022
               </span>
-              <span className="rounded-full bg-destructive px-2 py-0.5 text-[10px] font-semibold text-white">
-                Mandatory · QCO
+              <span className="rounded-full bg-ink px-2 py-0.5 text-[10px] font-semibold text-canvas">
+                Upcoming QCO
               </span>
               <span className="rounded-full bg-surface-strong px-2 py-0.5 text-[10px] font-semibold text-ink">
                 Active

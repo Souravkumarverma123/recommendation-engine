@@ -69,8 +69,8 @@ export function MechanismSection() {
             </p>
             <div className="mt-4 flex flex-wrap items-center gap-1.5 rounded-lg bg-canvas p-3">
               <span className="text-[12px] text-ink">Furniture (QCO) 2025</span>
-              <span className="ml-auto rounded-full bg-destructive px-2 py-0.5 text-[10px] font-semibold text-white">
-                Mandatory
+              <span className="ml-auto rounded-full bg-ink px-2 py-0.5 text-[10px] font-semibold text-canvas">
+                Upcoming
               </span>
             </div>
           </div>
