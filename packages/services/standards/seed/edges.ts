@@ -17,11 +17,29 @@
  * Idempotent: re-running refreshes in place. Run after `loadDemoStandards`
  * (`load.cli.ts` and the seam-test setup both do).
  */
+import { createHash } from "node:crypto";
+
 import { and, db, gte, inArray, lt, notInArray, sql } from "@repo/database";
 import { standardEdgesTable, standardsTable, type InsertStandard } from "@repo/database/schema";
 
 import { parseDesignation } from "../../bis/designation";
 import { ALLIED_BIS_ID_MIN, DEMO_EDGES, type DemoEdge } from "./demo-edges.data";
+
+/**
+ * Width of the companion id band. A designation's id is derived from its own
+ * key (see {@link companionBisId}), not from its position in a filtered list —
+ * a concurrent seed run, or a catalogue row appearing/disappearing between the
+ * lookup and the insert, can reorder or reshape that list, and a position-based
+ * id would then let two different designations land on the same
+ * `bisStandardId` and silently overwrite each other's row on conflict.
+ */
+const ALLIED_BIS_ID_RANGE = 1_000_000;
+
+/** Stable id for a companion designation — the same key always maps to the same id, run over run and process over process. */
+function companionBisId(key: string): number {
+  const digest = createHash("sha1").update(key).digest();
+  return ALLIED_BIS_ID_MIN + (digest.readUInt32BE(0) % ALLIED_BIS_ID_RANGE);
+}
 
 export interface LoadEdgesResult {
   /** Reviewed relationships processed. */
@@ -87,14 +105,15 @@ export async function loadDemoEdges(): Promise<LoadEdgesResult> {
     };
 
     // Targets with no catalogue row yet → a title-level companion in the allied
-    // band. Deterministic id (band base + position) so a re-run updates in place.
+    // band, keyed by `companionBisId` so the id depends only on the designation
+    // itself — never on this list's order — and a re-run updates in place.
     const needCompanion = DEMO_EDGES.filter(
       (e) => resolve(catalogue, e.to) === null,
     ).filter(
       (e, i, arr) => arr.findIndex((x) => keyOf(x.to) === keyOf(e.to)) === i,
     );
-    const companionRows = needCompanion.map((e, i) =>
-      companionRow(e, ALLIED_BIS_ID_MIN + i),
+    const companionRows = needCompanion.map((e) =>
+      companionRow(e, companionBisId(keyOf(e.to))),
     );
 
     let companionResolved: typeof catalogue = [];
