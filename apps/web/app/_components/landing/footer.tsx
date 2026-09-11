@@ -1,102 +1,35 @@
-import Link from "next/link";
-
-const GITHUB_URL = "https://github.com/Souravkumarverma123/recommendation-engine";
-
-type FooterLink = { label: string; href?: string; external?: boolean };
-
-const COLUMNS: { title: string; links: FooterLink[] }[] = [
-  {
-    title: "Product",
-    links: [
-      { label: "How it works", href: "#how-it-works" },
-      { label: "Features", href: "#features" },
-      { label: "Try the tool", href: "/dashboard" },
-    ],
-  },
-  {
-    title: "Standards coverage",
-    links: [
-      { label: "Cement & concrete" },
-      { label: "Structural steel" },
-      { label: "Electronics & IT hardware" },
-      { label: "PPE & helmets" },
-      { label: "Furniture" },
-    ],
-  },
-  {
-    title: "Compliance",
-    links: [
-      { label: "GFR Rule 144" },
-      { label: "BIS Act, 2016" },
-      { label: "Quality Control Orders" },
-    ],
-  },
-  {
-    title: "Project",
-    links: [{ label: "GitHub", href: GITHUB_URL, external: true }],
-  },
-];
-
-function FooterColumn({ title, links }: { title: string; links: FooterLink[] }) {
-  return (
-    <div>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.88px] text-on-dark-soft">
-        {title}
-      </p>
-      <ul className="mt-4 flex flex-col gap-3">
-        {links.map((link) => (
-          <li key={link.label} className="text-sm text-on-dark-soft">
-            {link.href ? (
-              link.external ? (
-                <a
-                  href={link.href}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="transition-colors hover:text-on-dark"
-                >
-                  {link.label}
-                </a>
-              ) : (
-                <Link href={link.href} className="transition-colors hover:text-on-dark">
-                  {link.label}
-                </Link>
-              )
-            ) : (
-              link.label
-            )}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
+import { Wordmark } from "~/app/_components/landing/hero";
 
 export function Footer() {
   return (
-    <footer className="bg-surface-dark px-6 py-16">
-      <div className="mx-auto grid max-w-[1200px] gap-10 sm:grid-cols-2 lg:grid-cols-5">
-        <div>
-          <div className="flex items-center gap-2 text-sm font-medium text-on-dark">
-            <span className="flex size-6 items-center justify-center rounded-sm bg-on-dark text-[11px] font-semibold text-surface-dark">
-              IS
-            </span>
-            Standards Engine
-          </div>
-          <p className="mt-3 text-sm leading-[1.5] text-on-dark-soft">
-            SIH 2026 · Government procurement, made defensible.
+    <footer className="border-t border-hairline bg-canvas">
+      <div className="mx-auto flex max-w-5xl flex-col gap-6 px-5 py-10 md:flex-row md:items-start md:justify-between md:px-8">
+        <div className="max-w-xs">
+          <Wordmark dark />
+          <p className="mt-3 text-[13px] leading-[1.6] text-muted-foreground">
+            Ranked Indian Standards for a procurement requirement, with
+            verified certification status and audit-ready evidence.
           </p>
         </div>
-
-        {COLUMNS.map((col) => (
-          <FooterColumn key={col.title} title={col.title} links={col.links} />
-        ))}
+        <div className="flex gap-10 text-[13px]">
+          <div className="flex flex-col gap-2">
+            <span className="font-medium text-ink">Product</span>
+            <a href="#mechanism" className="text-muted-foreground hover:text-ink">
+              How it works
+            </a>
+            <a href="#capabilities" className="text-muted-foreground hover:text-ink">
+              What you get
+            </a>
+            <a href="#faq" className="text-muted-foreground hover:text-ink">
+              FAQ
+            </a>
+          </div>
+        </div>
       </div>
-
-      <div className="mx-auto mt-12 max-w-[1200px] border-t border-white/10 pt-6">
-        <p className="text-xs leading-[1.4] text-on-dark-soft">
-          Standard numbers, titles, and QCO citations are sourced from the
-          Bureau of Indian Standards and referenced ISO/IEC equivalents. Full
-          standard text is not reproduced (BIS Act, 2016, s.11).
+      <div className="border-t border-hairline px-5 py-5 md:px-8">
+        <p className="mx-auto max-w-5xl text-[11.5px] text-muted-foreground">
+          Standards are sourced from the Bureau of Indian Standards catalogue.
+          Full standard text is not reproduced (BIS Act, 2016, s.11).
         </p>
       </div>
     </footer>

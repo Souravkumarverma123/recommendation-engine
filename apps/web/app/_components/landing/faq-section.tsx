@@ -10,70 +10,64 @@ import { useScrollReveal } from "~/hooks/use-scroll-reveal";
 
 const FAQS = [
   {
-    question: "How does the engine find the right standard?",
-    answer:
-      "It uses hybrid retrieval — semantic search over embeddings fused with lexical search via Reciprocal Rank Fusion — then an LLM ranks candidates and writes evidence. An independent QCO check and version resolution run after the model, so unverifiable standard numbers are dropped.",
+    q: "How is this different from searching the BIS portal myself?",
+    a: "The BIS portal lets you search the catalogue by name. It doesn't tell you which standards apply to your specification, or whether certification is legally mandatory. Manak answers both — and checks the second one independently, every time.",
   },
   {
-    question: "Does it check mandatory certification (QCO) independently?",
-    answer:
-      "Yes. Every recommendation is checked against the regulatory layer separately from retrieval. The badge shows Mandatory · QCO, Upcoming QCO, or Voluntary — and VOLUNTARY means checked and confirmed, not \u201cwe didn\u2019t look.\u201d",
+    q: "How do you decide a standard is mandatory versus voluntary?",
+    a: "By running a separate query against the Quality Control Order layer for the product itself. It is never inferred from the fact that a standard exists — “no QCO found” is a verified result, not an absence of information.",
   },
   {
-    question: "Can I describe the requirement in Hindi?",
-    answer:
-      "Yes. The engine normalises the requirement from English or Hindi and detects the language for the response. Standard numbers and titles stay canonical regardless of input language.",
+    q: "What happens if I've cited a standard that's been withdrawn?",
+    a: "Version resolution follows supersession — even when the replacement has a different or lower number, or is now part of another standard — and flags it as a gap warning so you correct the citation before the tender is published.",
   },
   {
-    question: "What are \u201callied standards\u201d?",
-    answer:
-      "Normative references, test methods, safety and terminology standards that the primary standard depends on. Each is tagged by role so you know where it belongs in the specification.",
+    q: "Can I use this in Hindi?",
+    a: "Yes. Describe the requirement in Hindi and the explanation, gap warnings, and draft clause come back in Hindi. Standard designations and titles stay in their canonical form regardless of query language.",
   },
   {
-    question: "What evidence does the engine provide?",
-    answer:
-      "The exact phrases from your input that triggered each recommendation — ready for file notes and audit. You also get the QCO citation, enforcement date, and source link where available.",
+    q: "Can I trust a citation enough to paste it into a tender?",
+    a: "Every standard number shown is checked against the harvested BIS catalogue, and every designation the reasoning step drafts is verified against that check before it reaches you. It cannot show you a standard that doesn't exist.",
   },
   {
-    question: "Does it handle superseded or withdrawn editions?",
-    answer:
-      "Yes. Supersession is followed automatically, even across different standard numbers. If a standard has been withdrawn or replaced, the engine flags it and cites the current edition instead.",
+    q: "What if my requirement doesn't map to a standard cleanly?",
+    a: "You'll see that directly, rather than a confident guess. A requirement that doesn't map to a clear match is reported as needing manual review, not silently forced into the nearest candidate.",
+  },
+  {
+    q: "What are allied standards, and why do they matter?",
+    a: "The normative references, test methods, safety, and terminology standards a recommended standard depends on — found by walking the standard's cross-reference graph, each tagged by role so you know where it belongs in the specification.",
   },
 ];
 
 export function FaqSection() {
-  const sectionRef = useScrollReveal();
+  const ref = useScrollReveal<HTMLDivElement>();
 
   return (
-    <section className="border-t border-hairline bg-canvas-soft px-6 py-20">
-      <div className="mx-auto max-w-[720px]">
-        <div ref={sectionRef} className="reveal">
-          <div className="text-center">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.88px] text-muted-foreground">
-              FAQ
-            </p>
-            <h2 className="mt-3 text-[28px] font-normal leading-[1.2] tracking-[-0.6px] text-ink sm:text-[36px] sm:tracking-[-0.72px]">
-              Frequently asked questions
-            </h2>
-          </div>
+    <section id="faq" className="border-t border-hairline bg-surface-card/40">
+      <div
+        ref={ref}
+        className="reveal mx-auto max-w-3xl px-5 py-20 md:px-8 md:py-28"
+      >
+        <h2 className="text-[28px] leading-[1.15] font-semibold tracking-tight text-ink md:text-[34px]">
+          Questions a procurement officer actually asks.
+        </h2>
 
-          <Accordion type="single" collapsible className="mt-10 w-full">
-            {FAQS.map((faq, i) => (
-              <AccordionItem
-                key={i}
-                value={`item-${i}`}
-                className="border-hairline"
-              >
-                <AccordionTrigger className="text-[15px] font-semibold text-ink hover:no-underline hover:text-primary [&[data-state=open]]:text-primary">
-                  {faq.question}
-                </AccordionTrigger>
-                <AccordionContent className="text-[14px] leading-[1.6] text-body">
-                  {faq.answer}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </div>
+        <Accordion type="single" collapsible className="mt-10 w-full">
+          {FAQS.map((item, i) => (
+            <AccordionItem
+              key={item.q}
+              value={`item-${i}`}
+              className="border-hairline py-1"
+            >
+              <AccordionTrigger className="text-left text-[15px] font-medium text-ink hover:no-underline">
+                {item.q}
+              </AccordionTrigger>
+              <AccordionContent className="text-[14px] leading-[1.65] text-body">
+                {item.a}
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
       </div>
     </section>
   );

@@ -1,26 +1,20 @@
-import { NavBar } from "./nav-bar";
-import { Hero } from "./hero";
-import { ProblemSection } from "./problem-section";
-import { PipelineSection } from "./pipeline-section";
-import { FeaturesSection } from "./features-section";
-import { ComparisonSection } from "./comparison-section";
-import { FaqSection } from "./faq-section";
-import { CtaBand } from "./cta-band";
-import { Footer } from "./footer";
+import { Hero } from "~/app/_components/landing/hero";
+import { MechanismSection } from "~/app/_components/landing/mechanism-section";
+import { ProofSection } from "~/app/_components/landing/proof-section";
+import { CapabilitiesSection } from "~/app/_components/landing/capabilities-section";
+import { FaqSection } from "~/app/_components/landing/faq-section";
+import { CtaBand } from "~/app/_components/landing/cta-band";
+import { Footer } from "~/app/_components/landing/footer";
 
 export function LandingPage() {
   return (
-    <div className="bg-canvas">
-      <NavBar />
-      <main>
-        <Hero />
-        <ProblemSection />
-        <PipelineSection />
-        <FeaturesSection />
-        <ComparisonSection />
-        <FaqSection />
-        <CtaBand />
-      </main>
+    <div className="flex min-h-screen flex-col bg-canvas">
+      <Hero />
+      <MechanismSection />
+      <ProofSection />
+      <CapabilitiesSection />
+      <FaqSection />
+      <CtaBand />
       <Footer />
     </div>
   );

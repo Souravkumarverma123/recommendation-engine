@@ -192,10 +192,11 @@ function parseHex(color: string): [number, number, number] {
   if (value.startsWith("#")) {
     const hex = value.slice(1);
     if (hex.length === 3) {
+      const [r = "0", g = "0", b = "0"] = hex;
       return [
-        parseInt(hex.charAt(0) + hex.charAt(0), 16) / 255,
-        parseInt(hex.charAt(1) + hex.charAt(1), 16) / 255,
-        parseInt(hex.charAt(2) + hex.charAt(2), 16) / 255,
+        parseInt(r + r, 16) / 255,
+        parseInt(g + g, 16) / 255,
+        parseInt(b + b, 16) / 255,
       ];
     }
     return [
@@ -294,6 +295,7 @@ export const CloudShader = ({
 
     let frame = 0;
     let running = true;
+    let visible = true;
     const reduceMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     ).matches;
@@ -316,9 +318,27 @@ export const CloudShader = ({
     observer.observe(canvas);
     resize();
 
+    // Off-screen canvases (e.g. a second shader further down the page) still
+    // cost a full GPU frame every tick if left running — pause the loop
+    // outside the viewport and resume on scroll-in.
+    const visibilityObserver = new IntersectionObserver(
+      ([entry]) => {
+        visible = entry?.isIntersecting ?? true;
+        if (visible && frame === 0) {
+          frame = requestAnimationFrame(draw);
+        }
+      },
+      { threshold: 0 },
+    );
+    visibilityObserver.observe(canvas);
+
     const start = performance.now();
     const draw = (now: number) => {
       if (!running) return;
+      if (!visible) {
+        frame = 0;
+        return;
+      }
       const p = paramsRef.current;
       const elapsed = reduceMotion ? 0 : ((now - start) / 1000) * p.speed;
       const cloud = parseHex(p.cloudColor);
@@ -340,6 +360,7 @@ export const CloudShader = ({
       running = false;
       cancelAnimationFrame(frame);
       observer.disconnect();
+      visibilityObserver.disconnect();
       gl.deleteBuffer(buffer);
       gl.deleteProgram(program);
       gl.deleteShader(vert);
@@ -353,6 +374,12 @@ export const CloudShader = ({
         "relative h-full min-h-80 w-full overflow-hidden",
         className,
       )}
+      style={{
+        // Shows through whenever WebGL is unavailable or shader compilation
+        // fails and the canvas never paints — without it the hero's white
+        // text would sit on a transparent background.
+        background: `linear-gradient(to bottom, ${skyTopColor}, ${skyBottomColor})`,
+      }}
     >
       <canvas
         ref={canvasRef}

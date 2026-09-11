@@ -1,60 +1,120 @@
+"use client";
+
 import Link from "next/link";
+import { ArrowRight, Github } from "lucide-react";
 
 import { CloudShader } from "~/components/ui/cloud-shader";
-import { PIPELINE_STAGES, PipelinePill } from "./pipeline-pill";
 
-function MockupCard() {
+const GITHUB_URL =
+  "https://github.com/Souravkumarverma123/recommendation-engine";
+
+export function Wordmark({ dark = false }: { dark?: boolean }) {
   return (
-    <div className="overflow-hidden rounded-[20px] border border-white/40 bg-white shadow-2xl">
-      <div className="flex items-center gap-2 border-b border-gray-100 bg-white px-4 py-3">
-        <span className="size-2.5 rounded-full bg-[#ff5f57]" />
-        <span className="size-2.5 rounded-full bg-[#ffbd2e]" />
-        <span className="size-2.5 rounded-full bg-[#28c840]" />
-        <span className="ml-2 font-mono text-xs text-gray-400">recommend.run</span>
+    <Link href="/" className="flex items-center gap-2">
+      <span
+        className={
+          dark
+            ? "flex size-7 items-center justify-center rounded-md bg-ink text-[13px] font-bold text-canvas"
+            : "flex size-7 items-center justify-center rounded-md bg-white/90 text-[13px] font-bold text-sky-700 shadow-sm"
+        }
+      >
+        म
+      </span>
+      <span
+        className={
+          dark
+            ? "text-[15px] font-semibold tracking-tight text-ink"
+            : "text-[15px] font-semibold tracking-tight text-white drop-shadow-sm"
+        }
+      >
+        Manak
+      </span>
+    </Link>
+  );
+}
+
+function HeroNav() {
+  return (
+    <nav className="relative z-20 mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-5 md:px-8">
+      <Wordmark />
+      <div className="hidden items-center gap-8 text-[13px] font-medium text-white/85 md:flex">
+        <a href="#mechanism" className="transition-colors hover:text-white">
+          How it works
+        </a>
+        <a href="#capabilities" className="transition-colors hover:text-white">
+          What you get
+        </a>
+        <a href="#faq" className="transition-colors hover:text-white">
+          FAQ
+        </a>
       </div>
+      <div className="flex items-center gap-3">
+        <a
+          href={GITHUB_URL}
+          target="_blank"
+          rel="noreferrer"
+          aria-label="View source on GitHub"
+          className="flex size-9 items-center justify-center rounded-full text-white/85 transition-colors hover:bg-white/10 hover:text-white"
+        >
+          <Github className="size-[18px]" />
+        </a>
+        <Link
+          href="/dashboard"
+          className="rounded-full bg-white px-4 py-2 text-[13px] font-semibold text-sky-700 shadow-md transition hover:bg-white/90"
+        >
+          Open the workspace
+        </Link>
+      </div>
+    </nav>
+  );
+}
 
-      <div className="grid md:grid-cols-[1fr_1.3fr]">
-        <div className="hidden border-gray-100 bg-[#f8f9ff] p-5 md:block md:border-r">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.88px] text-gray-400">
-            Procurement requirement
-          </p>
-          <div className="rounded-lg border border-[#e0e7ff] bg-white p-4 font-mono text-[13px] leading-[1.6] text-gray-700 shadow-sm">
-            500 ergonomic office chairs for a government secretariat, adjustable
-            height, lumbar support
+function ProductPreview() {
+  return (
+    <div className="relative mx-auto w-full max-w-3xl rounded-2xl border border-white/30 bg-white/90 p-1.5 shadow-2xl backdrop-blur-md md:rounded-[1.75rem] md:p-2">
+      <div className="rounded-xl border border-hairline bg-canvas md:rounded-3xl">
+        <div className="flex flex-col divide-y divide-hairline md:flex-row md:divide-x md:divide-y-0">
+          {/* Requirement column */}
+          <div className="flex flex-col p-5 md:w-[38%] md:shrink-0">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Procurement requirement
+            </p>
+            <p className="mt-2 text-[14px] leading-[1.5] text-ink">
+              &ldquo;500 ergonomic office chairs — swivel, height-adjustable,
+              for a district office.&rdquo;
+            </p>
+            <div className="mt-6 flex flex-1 flex-col justify-end gap-2">
+              <p className="text-[11px] text-muted-foreground">
+                Checked against the BIS catalogue and the QCO layer
+                independently — mandatory status is verified, never guessed.
+              </p>
+            </div>
           </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {PIPELINE_STAGES.map((stage) => (
-              <PipelinePill key={stage.pill} label={stage.pill} className={stage.className} />
-            ))}
-          </div>
-        </div>
 
-        <div className="bg-white p-5">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.88px] text-gray-400">
-            Result
-          </p>
-          <div className="rounded-xl border border-gray-100 bg-[#f8f9ff] p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="font-mono text-sm font-semibold text-gray-900">IS 17631 : 2022</span>
-              <span className="inline-flex items-center rounded-full bg-[#c08532] px-[10px] py-1 text-[11px] font-semibold uppercase tracking-[0.88px] text-white">
-                Mandatory · QCO
+          {/* Result column */}
+          <div className="flex flex-1 flex-col gap-3 p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-mono text-[13px] font-semibold text-ink">
+                IS 17631:2022
+              </span>
+              <span className="rounded-full bg-ink px-2 py-0.5 text-[10px] font-semibold text-canvas">
+                Upcoming QCO
+              </span>
+              <span className="rounded-full bg-surface-strong px-2 py-0.5 text-[10px] font-semibold text-ink">
+                Active
               </span>
             </div>
-            <p className="mt-2 text-sm font-medium text-gray-900">Office chairs — Specification</p>
-            <p className="mt-3 text-xs leading-[1.5] text-gray-500">
-              Furniture (Quality Control) Order 2025 · S.O. 801(E) · in force
-              from 14 Feb 2026
+            <p className="text-[13px] text-body">Work chairs</p>
+            <p className="text-[12px] leading-[1.6] text-muted-foreground">
+              Furniture (QCO) 2025 · S.O. 801(E) · in force from{" "}
+              <span className="text-ink">14 Aug 2026</span> (MSME)
             </p>
-            <p className="mt-3 text-xs leading-[1.5] text-gray-500">
-              Evidence: <span className="font-medium text-gray-900">&ldquo;ergonomic office chairs&rdquo;</span>,{" "}
-              <span className="font-medium text-gray-900">&ldquo;adjustable height&rdquo;</span>
-            </p>
-          </div>
-          <div className="mt-3 border-l-2 border-[#e0e7ff] pl-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.88px] text-gray-400">
-              Allied standards
-            </p>
-            <p className="mt-1.5 font-mono text-xs text-gray-600">IS 3087 · Test method</p>
+            <div className="mt-1 rounded-lg bg-surface-card p-3">
+              <p className="font-mono text-[11.5px] leading-[1.7] text-body">
+                &hellip;shall conform to IS 17631:2022 and bear the Standard
+                Mark (ISI) under BIS licence&hellip;
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -62,90 +122,52 @@ function MockupCard() {
   );
 }
 
-const STATS = [
-  { value: "22,000+", label: "Indian Standards indexed" },
-  { value: "500+", label: "Quality Control Orders tracked" },
-  { value: "< 10s", label: "Average response time" },
-];
-
 export function Hero() {
   return (
-    <section className="relative min-h-[50rem] w-full overflow-hidden">
-      <CloudShader className="absolute inset-0" />
+    <div className="relative w-full overflow-hidden">
+      <CloudShader
+        className="absolute inset-0"
+        skyTopColor="#2f6ba8"
+        skyBottomColor="#8cbfe8"
+        cloudColor="#fbf8f2"
+      />
 
-      {/* hero content */}
-      <div className="relative z-10 mx-auto flex max-w-4xl flex-col items-center px-4 pt-20 text-center md:pt-28">
-        <span className="animate-hero-badge mb-6 inline-flex items-center rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.88px] text-white backdrop-blur-sm">
-          Built for GFR &amp; QCO compliance
-        </span>
-        <h1 className="animate-hero-title max-w-[880px] text-[32px] font-bold leading-[1.1] tracking-[-0.02em] text-white drop-shadow-md sm:text-[56px] sm:leading-[1.05] lg:text-[72px]">
-          Cite the right Indian Standard.{" "}
-          <br className="hidden md:block" />
-          Every time.
+      <HeroNav />
+
+      <div className="relative z-10 mx-auto flex max-w-3xl flex-col items-center px-5 pt-10 text-center md:pt-16">
+        <h1 className="animate-hero-title text-[2.5rem] leading-[1.1] font-bold tracking-tight text-white drop-shadow-md sm:text-6xl md:text-7xl md:leading-[1.05]">
+          Cite the right
+          <br className="hidden md:block" /> standard. Every time.
         </h1>
-        <p className="animate-hero-subtitle mt-6 max-w-[620px] text-base leading-[1.6] text-white/85 drop-shadow-sm md:text-lg">
-          Paste a procurement requirement and get ranked Indian Standards with
-          verified current editions, an independent mandatory-certification
-          check, allied standards, and evidence you can defend to an auditor —
-          in English or Hindi.
+        <p className="animate-hero-subtitle mt-6 max-w-xl text-[15px] leading-[1.6] text-white/90 drop-shadow-sm md:text-[17px]">
+          Paste a procurement requirement, in English or Hindi. Get the
+          current Indian Standard, its verified BIS certification status, and
+          a citation you can defend to an auditor.
         </p>
-
         <div className="animate-hero-cta mt-8 flex flex-col items-center gap-3 sm:flex-row">
           <Link
             href="/dashboard"
-            className="rounded-full bg-white px-6 py-2.5 text-sm font-semibold text-sky-800 shadow-lg transition hover:-translate-y-0.5 hover:bg-white/90"
+            className="group inline-flex items-center gap-2 rounded-full bg-white px-6 py-2.5 text-[14px] font-semibold text-sky-700 shadow-lg transition hover:-translate-y-0.5 hover:bg-white/90"
           >
-            Try the recommendation engine
+            Open the workspace
+            <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
           </Link>
           <a
-            href="#how-it-works"
-            className="rounded-full border border-white/40 bg-white/10 px-6 py-2.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/20"
+            href="#mechanism"
+            className="rounded-full border border-white/40 bg-white/10 px-6 py-2.5 text-[14px] font-semibold text-white backdrop-blur-sm transition hover:bg-white/20"
           >
             See how it works
           </a>
         </div>
-
-        {/* Social proof stats */}
-        <div className="animate-hero-cta mt-10 flex flex-wrap items-center justify-center gap-8 sm:gap-12">
-          {STATS.map((stat) => (
-            <div key={stat.label} className="flex flex-col items-center">
-              <span className="font-mono text-[28px] font-bold leading-none text-white drop-shadow-sm sm:text-[32px]">
-                {stat.value}
-              </span>
-              <span className="mt-1.5 text-[12px] text-white/60">{stat.label}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* Trust badges */}
-        <div className="animate-hero-cta mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[13px] text-white/70">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="flex size-3.5 items-center justify-center rounded-full bg-white/20">
-              <span className="size-1.5 rounded-full bg-white" />
-            </span>
-            BIS catalogue verified
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="flex size-3.5 items-center justify-center rounded-full bg-white/20">
-              <span className="size-1.5 rounded-full bg-white" />
-            </span>
-            English &amp; Hindi
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="flex size-3.5 items-center justify-center rounded-full bg-white/20">
-              <span className="size-1.5 rounded-full bg-white" />
-            </span>
-            Audit-ready evidence
-          </span>
-        </div>
+        <p className="mt-4 text-[12px] text-white/70">
+          187 QCOs checked independently, across ~769 products — never
+          inferred from the standard alone.
+        </p>
       </div>
 
-      {/* Mockup card — white with black text, blue/near-white accents */}
-      <div className="animate-hero-card relative z-10 mx-auto mt-12 w-full max-w-5xl px-4 pb-6 md:mt-16 md:px-8">
-        <div className="rounded-[24px] border border-white/30 bg-white/20 p-2 shadow-2xl backdrop-blur-md md:p-3">
-          <MockupCard />
-        </div>
+      <div className="animate-hero-card relative z-10 mx-auto mt-12 w-full max-w-5xl px-5 pb-16 md:mt-16 md:px-8 md:pb-24">
+        <ProductPreview />
       </div>
-    </section>
+    </div>
   );
 }
