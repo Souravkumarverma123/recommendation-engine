@@ -13,29 +13,41 @@
  */
 import { sameStandard } from "../bis/designation";
 
-/** Lowercase and collapse whitespace for a lenient substring comparison. */
-function normalizeForMatch(text: string): string {
-  return text.toLowerCase().replace(/\s+/g, " ").trim();
+/**
+ * The span of `sourceText` that matches `quote`, or `null` if there is none.
+ * The match ignores case and treats any run of the quote's whitespace as any
+ * run of whitespace, but what comes back is the text exactly as the officer
+ * wrote it — never the model's copy of it.
+ */
+function sourceSpanFor(quote: string, sourceText: string): string | null {
+  const trimmed = quote.trim();
+  if (!trimmed) return null;
+  const pattern = trimmed
+    .split(/\s+/)
+    .map((token) => token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("\\s+");
+  const match = new RegExp(pattern, "i").exec(sourceText);
+  return match ? match[0] : null;
 }
 
 /**
- * Keep only the excerpts the model actually lifted from `sourceText`. Comparison
- * is case- and whitespace-insensitive; duplicates are removed. A paraphrase or
- * an invented quote is dropped — "evidence excerpts drawn from the input" is a
- * hard contract (user story 5).
+ * Keep only the excerpts the model actually lifted from `sourceText`, returned
+ * as the officer's own text (see {@link sourceSpanFor}) so a re-cased or
+ * re-spaced quote is never shown as if copied. Duplicates are removed; a
+ * paraphrase or an invented quote is dropped — "evidence excerpts drawn from
+ * the input" is a hard contract (user story 5).
  */
 export function verbatimExcerpts(quotes: string[], sourceText: string): string[] {
-  const haystack = normalizeForMatch(sourceText);
   const seen = new Set<string>();
   const kept: string[] = [];
 
   for (const quote of quotes) {
-    const trimmed = quote.trim();
-    if (!trimmed) continue;
-    const normalized = normalizeForMatch(trimmed);
-    if (seen.has(normalized) || !haystack.includes(normalized)) continue;
-    seen.add(normalized);
-    kept.push(trimmed);
+    const span = sourceSpanFor(quote, sourceText);
+    if (!span) continue;
+    const key = span.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    kept.push(span);
   }
 
   return kept;

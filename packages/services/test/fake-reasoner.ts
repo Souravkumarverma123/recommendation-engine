@@ -39,29 +39,46 @@ function firstMatch(re: RegExp, text: string): string | null {
 }
 
 function classifyRole(candidate: ReasonerCandidate, isTop: boolean): StandardRole {
+  // The fake echoes retrieval order, so the top hit is its PRIMARY — decide
+  // that before the keyword heuristics (a product spec whose title mentions
+  // "Test Methods" is still the primary standard, not a test-method companion).
+  if (isTop) return "PRIMARY";
   const haystack = `${candidate.title} ${candidate.typeOfStandard ?? ""}`.toLowerCase();
   if (/test method/.test(haystack)) return "TEST_METHOD";
   if (/terminology|glossary|vocabulary/.test(haystack)) return "TERMINOLOGY";
   if (/safety/.test(haystack)) return "SAFETY";
-  if (isTop) return "PRIMARY";
   if (/code of practice|guidelines|installation/.test(haystack)) return "NORMATIVE_REFERENCE";
   return "RELATED";
 }
 
-/** Words (4+ chars) that appear in both the requirement and the candidate's text. */
+/**
+ * Contiguous spans of the requirement that also read as a run in the
+ * candidate's text — the longest such span starting at each word, so the
+ * fixtures exercise real phrase evidence ("hot rolled structural steel") and
+ * its verbatim verification, not just isolated word hits. Each span is sliced
+ * straight from `specText`, so it is a literal substring of the officer's input.
+ */
 function evidenceFor(candidate: ReasonerCandidate, specText: string): string[] {
   const candidateText = `${candidate.title} ${candidate.summary ?? ""}`.toLowerCase();
-  const seen = new Set<string>();
+  const words = [...specText.matchAll(/[A-Za-z0-9][A-Za-z0-9-]*/g)];
   const kept: string[] = [];
-  for (const raw of specText.split(/[^A-Za-z0-9]+/)) {
-    const word = raw.trim();
-    if (word.length < 4) continue;
-    const lower = word.toLowerCase();
-    if (seen.has(lower) || !candidateText.includes(lower)) continue;
-    seen.add(lower);
-    kept.push(word);
-    if (kept.length === 3) break;
+  let cursor = 0;
+
+  for (let i = 0; i < words.length && kept.length < 3; i++) {
+    if (i < cursor) continue;
+    let best: { span: string; nextWord: number } | null = null;
+    for (let j = i; j < Math.min(words.length, i + 4); j++) {
+      const start = words[i]!.index;
+      const end = words[j]!.index + words[j]![0].length;
+      const span = specText.slice(start, end);
+      if (candidateText.includes(span.toLowerCase())) best = { span, nextWord: j + 1 };
+    }
+    if (best && (best.span.includes(" ") || best.span.length >= 4)) {
+      kept.push(best.span);
+      cursor = best.nextWord;
+    }
   }
+
   return kept;
 }
 
@@ -137,11 +154,16 @@ export class FakeRecommendationReasoner implements RecommendationReasoner {
       evidence: evidenceFor(candidate, specText),
     }));
 
+    // Draft the clause from whichever standard was classified PRIMARY, not a
+    // fixed list position — so the fixture stays honest if the ranking changes.
+    const primaryNumber = rankedStandards.find((s) => s.role === "PRIMARY")?.number;
+    const primary = candidates.find((c) => c.number === primaryNumber);
+
     return Promise.resolve({
       requirementSummary: `Procurement requirement: ${specText.slice(0, 160)}`,
       rankedStandards,
       gapWarnings: gapWarningsFor(specText, candidates),
-      draftClause: draftClauseFor(candidates[0], specText),
+      draftClause: draftClauseFor(primary, specText),
     });
   }
 }
@@ -149,9 +171,10 @@ export class FakeRecommendationReasoner implements RecommendationReasoner {
 export const fakeRecommendationReasoner = new FakeRecommendationReasoner();
 
 /**
- * A reasoner that emits exactly what it is told to — for the seam test that
- * checks a hallucinated designation (one not in the candidate set) is dropped
- * by post-hoc verification.
+ * A reasoner that emits exactly what it is told to — for the seam tests that
+ * check post-hoc verification (a hallucinated designation is dropped) and that
+ * assembly follows the model's ranking even when its PRIMARY is not the
+ * top retrieval hit.
  */
 export class ScriptedRecommendationReasoner implements RecommendationReasoner {
   constructor(private readonly script: RecommendationReasoning) {}

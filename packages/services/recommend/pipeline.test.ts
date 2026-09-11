@@ -190,6 +190,43 @@ describe("recommend.run — the LLM reasoning layer (ticket #10)", () => {
     expect(resultFor(output, "IS 17631:2022")).toBeDefined();
   });
 
+  it("orders results by the model's ranking and drafts the clause for its PRIMARY, not the top retrieval hit", async () => {
+    const scripted = new ScriptedRecommendationReasoner({
+      requirementSummary: "Cement supply.",
+      rankedStandards: [
+        {
+          number: "IS 269:2015",
+          role: "PRIMARY",
+          reason: "the product specification",
+          evidence: ["portland cement"],
+        },
+        {
+          number: "IS 456:2000",
+          role: "NORMATIVE_REFERENCE",
+          reason: "the design code that uses the cement",
+          evidence: [],
+        },
+      ],
+      gapWarnings: [],
+      draftClause:
+        "The cement supplied shall conform to IS 269:2015 and bear the BIS Standard Mark under licence.",
+    });
+    const guided = new RecommendService({
+      standards: new StandardsService({ embeddings: fakeEmbeddingProvider }),
+      qco: new QcoService(),
+      reasoner: scripted,
+    });
+
+    const output = await guided.run({ specText: "portland cement for concrete works" });
+
+    expect(output.results.slice(0, 2).map((r) => r.number)).toEqual([
+      "IS 269:2015",
+      "IS 456:2000",
+    ]);
+    expect(output.results[0]?.role).toBe("PRIMARY");
+    expect(output.draftClause).toMatch(/IS 269:2015/);
+  });
+
   it("still answers when the reasoner is disabled — retrieval order, no reasoning fields", async () => {
     const bare = new RecommendService({
       standards: new StandardsService({ embeddings: fakeEmbeddingProvider }),

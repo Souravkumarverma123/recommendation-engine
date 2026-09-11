@@ -17,9 +17,9 @@ describe("verbatimExcerpts — keep only what the model lifted from the input", 
     ]);
   });
 
-  it("is case- and whitespace-insensitive", () => {
+  it("matches case- and whitespace-insensitively but returns the officer's own text", () => {
     expect(verbatimExcerpts(["  Ergonomic   Office  Chairs "], spec)).toEqual([
-      "Ergonomic   Office  Chairs",
+      "ergonomic office chairs",
     ]);
   });
 
