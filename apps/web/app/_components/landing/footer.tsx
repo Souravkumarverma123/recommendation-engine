@@ -40,24 +40,24 @@ const COLUMNS: { title: string; links: FooterLink[] }[] = [
 function FooterColumn({ title, links }: { title: string; links: FooterLink[] }) {
   return (
     <div>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.88px] text-muted-foreground">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.88px] text-on-dark-soft">
         {title}
       </p>
       <ul className="mt-4 flex flex-col gap-3">
         {links.map((link) => (
-          <li key={link.label} className="text-sm text-body">
+          <li key={link.label} className="text-sm text-on-dark-soft">
             {link.href ? (
               link.external ? (
                 <a
                   href={link.href}
                   target="_blank"
                   rel="noreferrer"
-                  className="transition-colors hover:text-ink"
+                  className="transition-colors hover:text-on-dark"
                 >
                   {link.label}
                 </a>
               ) : (
-                <Link href={link.href} className="transition-colors hover:text-ink">
+                <Link href={link.href} className="transition-colors hover:text-on-dark">
                   {link.label}
                 </Link>
               )
@@ -73,16 +73,16 @@ function FooterColumn({ title, links }: { title: string; links: FooterLink[] }) 
 
 export function Footer() {
   return (
-    <footer className="border-t border-hairline bg-canvas px-6 py-16">
+    <footer className="bg-surface-dark px-6 py-16">
       <div className="mx-auto grid max-w-[1200px] gap-10 sm:grid-cols-2 lg:grid-cols-5">
         <div>
-          <div className="flex items-center gap-2 text-sm font-medium text-ink">
-            <span className="flex size-6 items-center justify-center rounded-sm bg-primary text-[11px] font-semibold text-white">
+          <div className="flex items-center gap-2 text-sm font-medium text-on-dark">
+            <span className="flex size-6 items-center justify-center rounded-sm bg-on-dark text-[11px] font-semibold text-surface-dark">
               IS
             </span>
             Standards Engine
           </div>
-          <p className="mt-3 text-sm leading-[1.5] text-body">
+          <p className="mt-3 text-sm leading-[1.5] text-on-dark-soft">
             SIH 2026 · Government procurement, made defensible.
           </p>
         </div>
@@ -92,8 +92,8 @@ export function Footer() {
         ))}
       </div>
 
-      <div className="mx-auto mt-12 max-w-[1200px] border-t border-hairline-soft pt-6">
-        <p className="text-xs leading-[1.4] text-muted-foreground">
+      <div className="mx-auto mt-12 max-w-[1200px] border-t border-white/10 pt-6">
+        <p className="text-xs leading-[1.4] text-on-dark-soft">
           Standard numbers, titles, and QCO citations are sourced from the
           Bureau of Indian Standards and referenced ISO/IEC equivalents. Full
           standard text is not reproduced (BIS Act, 2016, s.11).

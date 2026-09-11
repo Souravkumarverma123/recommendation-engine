@@ -1,4 +1,7 @@
+"use client";
+
 import { AlertTriangle, Ban, FileWarning } from "lucide-react";
+import { useScrollReveal } from "~/hooks/use-scroll-reveal";
 
 const PROBLEMS = [
   {
@@ -19,26 +22,35 @@ const PROBLEMS = [
 ];
 
 export function ProblemSection() {
+  const sectionRef = useScrollReveal();
+
   return (
     <section id="problem" className="border-t border-hairline bg-canvas px-6 py-20">
       <div className="mx-auto max-w-[1200px]">
-        <div className="max-w-[640px]">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.88px] text-muted-foreground">
-            The problem
-          </p>
-          <h2 className="mt-3 text-[28px] font-normal leading-[1.2] tracking-[-0.6px] text-ink sm:text-[36px] sm:tracking-[-0.72px]">
-            Manual research is slow — and the mistakes are expensive
-          </h2>
-        </div>
+        <div ref={sectionRef} className="reveal">
+          <div className="max-w-[640px]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.88px] text-muted-foreground">
+              The problem
+            </p>
+            <h2 className="mt-3 text-[28px] font-normal leading-[1.2] tracking-[-0.6px] text-ink sm:text-[36px] sm:tracking-[-0.72px]">
+              Manual research is slow — and the mistakes are expensive
+            </h2>
+          </div>
 
-        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {PROBLEMS.map((p) => (
-            <div key={p.title} className="rounded-lg border border-hairline bg-surface-card p-6">
-              <p.icon className="size-5 text-primary" />
-              <h3 className="mt-4 text-[18px] font-semibold leading-[1.4] text-ink">{p.title}</h3>
-              <p className="mt-2 text-sm leading-[1.5] text-body">{p.body}</p>
-            </div>
-          ))}
+          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {PROBLEMS.map((p) => (
+              <div
+                key={p.title}
+                className="card-hover rounded-lg border border-hairline bg-surface-card p-6"
+              >
+                <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
+                  <p.icon className="size-5 text-primary" />
+                </div>
+                <h3 className="mt-4 text-[18px] font-semibold leading-[1.4] text-ink">{p.title}</h3>
+                <p className="mt-2 text-sm leading-[1.5] text-body">{p.body}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </section>

@@ -37,17 +37,32 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  /* Brand-specific tokens, referenced directly (bg-canvas-soft, text-body, border-hairline, etc.) */
+  /* Brand-specific tokens */
   --color-canvas: var(--canvas);
   --color-canvas-soft: var(--canvas-soft);
+  --color-canvas-light: var(--canvas-light);
   --color-surface-card: var(--surface-card);
+  --color-surface-card-dark: var(--surface-card-dark);
+  --color-surface-elevated-dark: var(--surface-elevated-dark);
   --color-surface-strong: var(--surface-strong);
+  --color-surface-soft: var(--surface-soft);
+  --color-surface-soft-light: var(--surface-soft-light);
   --color-ink: var(--ink);
   --color-body: var(--body);
+  --color-body-on-light: var(--body-on-light);
   --color-body-strong: var(--body-strong);
+  --color-on-dark: var(--on-dark);
+  --color-on-dark-soft: var(--on-dark-soft);
+  --color-on-primary: var(--on-primary);
   --color-hairline: var(--hairline);
   --color-hairline-soft: var(--hairline-soft);
   --color-hairline-strong: var(--hairline-strong);
+  --color-primary-disabled: var(--primary-disabled);
+  --color-trading-up: var(--trading-up);
+  --color-trading-down: var(--trading-down);
+  --color-info: var(--info);
+  --color-warning: var(--warning);
+  --color-brand-accent: var(--brand-accent);
 
   --color-timeline-thinking: var(--timeline-thinking);
   --color-timeline-grep: var(--timeline-grep);
@@ -74,32 +89,44 @@
 :root {
   --radius: 0.5rem;
 
-  /* Brand surfaces */
-  --canvas: #f7f7f4;
-  --canvas-soft: #fafaf7;
-  --surface-card: #ffffff;
-  --surface-strong: #e6e5e0;
+  /* Cal.com Light Theme */
+  --canvas: #ffffff;
+  --canvas-soft: #f8f9fa;
+  --canvas-light: #ffffff;
+  --surface-card: #f5f5f5;
+  --surface-card-dark: #101010;
+  --surface-elevated-dark: #1a1a1a;
+  --surface-strong: #e5e7eb;
+  --surface-soft: #f8f9fa;
+  --surface-soft-light: #f5f5f5;
 
   /* Hairlines */
-  --hairline: #e6e5e0;
-  --hairline-soft: #efeee8;
-  --hairline-strong: #cfcdc4;
+  --hairline: #e5e7eb;
+  --hairline-soft: #f3f4f6;
+  --hairline-strong: #d1d5db;
 
   /* Text */
-  --ink: #26251e;
-  --body: #5a5852;
-  --body-strong: #26251e;
-  --muted-ink: #807d72;
-  --muted-soft: #a09c92;
-
-  /* Brand accent */
-  --primary: #f54e00;
-  --primary-active: #d04200;
+  --ink: #111111;
+  --body: #374151;
+  --body-on-light: #374151;
+  --body-strong: #111111;
+  --on-dark: #ffffff;
+  --on-dark-soft: #a1a1aa;
   --on-primary: #ffffff;
+  --muted-ink: #6b7280;
+  --muted-soft: #898989;
+
+  /* Brand accent — Cal.com black */
+  --primary: #111111;
+  --primary-active: #242424;
+  --primary-disabled: #d1d5db;
 
   /* Semantic */
-  --success: #1f8a65;
-  --error: #cf2d56;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --info: #3b82f6;
+  --brand-accent: #3b82f6;
 
   /* AI-timeline pill palette */
   --timeline-thinking: #dfa88f;
@@ -107,6 +134,10 @@
   --timeline-read: #9fbbe0;
   --timeline-edit: #c0a8dd;
   --timeline-done: #c08532;
+
+  /* Trading (kept for dashboard) */
+  --trading-up: #10b981;
+  --trading-down: #ef4444;
 
   /* shadcn-mapped tokens */
   --background: var(--canvas);
@@ -120,21 +151,105 @@
   --secondary-foreground: var(--ink);
   --muted: var(--hairline-soft);
   --muted-foreground: var(--muted-ink);
-  --accent: var(--hairline-soft);
+  --accent: var(--surface-card);
   --accent-foreground: var(--ink);
   --destructive: var(--error);
   --border: var(--hairline);
-  --input: var(--hairline-strong);
-  --ring: var(--primary);
+  --input: var(--hairline);
+  --ring: var(--ink);
 
   --sidebar: var(--canvas);
   --sidebar-foreground: var(--ink);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--on-primary);
-  --sidebar-accent: var(--hairline-soft);
+  --sidebar-accent: var(--surface-card);
   --sidebar-accent-foreground: var(--ink);
   --sidebar-border: var(--hairline);
-  --sidebar-ring: var(--primary);
+  --sidebar-ring: var(--ink);
+}
+
+/* Scroll-reveal animation system */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.reveal.visible > * {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal.visible > *.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.reveal.visible > *:nth-child(1) { transition-delay: 0ms; }
+.reveal.visible > *:nth-child(2) { transition-delay: 80ms; }
+.reveal.visible > *:nth-child(3) { transition-delay: 160ms; }
+.reveal.visible > *:nth-child(4) { transition-delay: 240ms; }
+.reveal.visible > *:nth-child(5) { transition-delay: 320ms; }
+.reveal.visible > *:nth-child(6) { transition-delay: 400ms; }
+
+/* Hero entrance animations */
+@keyframes hero-badge-in {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes hero-title-in {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes hero-subtitle-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes hero-cta-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes hero-card-in {
+  from { opacity: 0; transform: translateY(32px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.animate-hero-badge { animation: hero-badge-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both; }
+.animate-hero-title { animation: hero-title-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both; }
+.animate-hero-subtitle { animation: hero-subtitle-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.35s both; }
+.animate-hero-cta { animation: hero-cta-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.45s both; }
+.animate-hero-card { animation: hero-card-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.55s both; }
+
+/* Card hover — subtle shadow lift */
+.card-hover {
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.card-hover:hover {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
 }
 
 @layer base {
@@ -145,11 +260,21 @@
     @apply bg-background text-foreground;
   }
 
-  /* Hairline-only depth — no drop shadows anywhere in the system. */
   [data-slot="card"],
   [data-slot="input"],
   [data-slot="button"],
   [data-slot="badge"] {
     box-shadow: none;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+  .reveal.visible > * { opacity: 1; transform: none; transition: none; }
+  .animate-hero-badge,
+  .animate-hero-title,
+  .animate-hero-subtitle,
+  .animate-hero-cta,
+  .animate-hero-card { animation: none; opacity: 1; }
+  .card-hover:hover { transform: none; box-shadow: none; }
 }
