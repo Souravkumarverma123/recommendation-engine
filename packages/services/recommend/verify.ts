@@ -66,8 +66,13 @@ export function traceToCandidate<T extends { number: string }>(
   return candidates.find((candidate) => sameStandard(candidate.number, emittedNumber)) ?? null;
 }
 
-/** A BIS-designation-shaped run inside free prose: "IS 456", "IS 1489 (Part 1) : 1991", "IS/IEC 62368-1:2023". */
-const DESIGNATION_IN_PROSE_RE =
+/**
+ * A BIS-designation-shaped run inside free prose: "IS 456", "IS 1489 (Part 1) : 1991",
+ * "IS/IEC 62368-1:2023". Exported for reuse by anything that needs to find a
+ * designation cited in officer-written text, not just this module's own
+ * candidate-tracing check (e.g. `recommend/supersession.ts`).
+ */
+export const DESIGNATION_IN_PROSE_RE =
   /\b(?:IS|SP)(?:\s*\/\s*(?:ISO|IEC))*\s*\d{1,5}(?:\s*\(\s*Part[^)]*\))?(?:\s*:\s*\d{4})?/gi;
 
 /**

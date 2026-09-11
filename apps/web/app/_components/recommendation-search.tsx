@@ -77,6 +77,24 @@ function formatDate(iso: string): string {
   });
 }
 
+function VersionNote({ result }: { result: Recommendation }) {
+  if (result.supersedes.length === 0 && !result.concurrentWith) return null;
+
+  return (
+    <p className="text-muted-foreground text-xs">
+      {result.supersedes.length > 0 && (
+        <>Supersedes {result.supersedes.join(", ")} — cite this edition instead.</>
+      )}
+      {result.concurrentWith && (
+        <span className="block">
+          {result.concurrentWith.number} remains concurrently valid until{" "}
+          {formatDate(result.concurrentWith.validUntil)}.
+        </span>
+      )}
+    </p>
+  );
+}
+
 function QcoCitationLine({ result }: { result: Recommendation }) {
   const { qco, qcoNote } = result;
   if (!qco) return null;
@@ -256,6 +274,7 @@ export function RecommendationSearch() {
                   </div>
                 </div>
                 <p className="text-sm">{result.title}</p>
+                <VersionNote result={result} />
                 {result.reason && (
                   <p className="text-muted-foreground text-sm">{result.reason}</p>
                 )}

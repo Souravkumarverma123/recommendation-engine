@@ -7,7 +7,9 @@
  * method and its frozen contract. A query with no keyword overlap with a
  * standard's text can now still surface it via the semantic list.
  */
-import { db, sql } from "@repo/database";
+import { db, inArray, sql } from "@repo/database";
+import { standardsTable } from "@repo/database/schema";
+import { parseDesignation } from "../bis/designation";
 import { defaultEmbeddingProvider, type EmbeddingProvider } from "../llm/embeddings";
 import {
   standardsSearchInputSchema,
@@ -22,6 +24,13 @@ import {
   type AlliedRelation,
   type AlliedStandard,
 } from "./allied";
+import {
+  MAX_CHAIN_HOPS,
+  resolveVersion,
+  VersionIndex,
+  type VersionRow,
+  type VersionResolution,
+} from "./version";
 
 interface RankedRow extends Record<string, unknown> {
   number: string;
@@ -251,6 +260,71 @@ export class StandardsService {
         ),
       ]),
     );
+  }
+
+  /**
+   * The current-edition resolution of each designation in `numbers`
+   * (docs/PRD.md §Pipeline step 7, user stories 7-10) — follows `isStatus` /
+   * `supersededByRaw` from each shortlisted standard to the edition that
+   * actually applies today, however many hops, number changes, or part
+   * re-homings that takes.
+   *
+   * Fetches only what the walk can actually need: round 0 is every edition of
+   * the requested designations (scoped by `where number_normalized in (...)`,
+   * the same shape `allied()` uses); each further round fetches only the
+   * `supersededByRaw` targets the previous round's withdrawn rows introduced
+   * and this call hasn't already fetched, capped at {@link MAX_CHAIN_HOPS}
+   * rounds — the same ceiling {@link resolveVersion}'s own walk respects. A
+   * real BIS chain is one or two hops, so this is a handful of small, indexed
+   * queries rather than one scan of the whole catalogue. The walk itself is the
+   * pure {@link resolveVersion}. Results are keyed by the exact designation
+   * passed in; a designation the index has no row for is absent from the map.
+   */
+  async resolveVersions(numbers: string[]): Promise<Map<string, VersionResolution>> {
+    const wanted = [...new Set(numbers)].filter((n) => n.length > 0);
+    if (wanted.length === 0) return new Map();
+
+    const rows: VersionRow[] = [];
+    const fetchedKeys = new Set<string>();
+    let frontier = new Set(
+      wanted
+        .map((n) => parseDesignation(n)?.key)
+        .filter((key): key is string => key != null),
+    );
+
+    for (let hop = 0; hop < MAX_CHAIN_HOPS && frontier.size > 0; hop++) {
+      const toFetch = [...frontier].filter((key) => !fetchedKeys.has(key));
+      if (toFetch.length === 0) break;
+      toFetch.forEach((key) => fetchedKeys.add(key));
+
+      const batch = await db
+        .select({
+          number: standardsTable.number,
+          title: standardsTable.title,
+          isStatus: standardsTable.isStatus,
+          supersededByRaw: standardsTable.supersededByRaw,
+          validUpto: standardsTable.validUpto,
+          editionYear: standardsTable.editionYear,
+        })
+        .from(standardsTable)
+        .where(inArray(standardsTable.numberNormalized, toFetch));
+      rows.push(...batch);
+
+      frontier = new Set(
+        batch
+          .filter((row) => toLifecycleStatus(row.isStatus) === "WITHDRAWN" && row.supersededByRaw)
+          .map((row) => parseDesignation(row.supersededByRaw as string)?.key)
+          .filter((key): key is string => key != null && !fetchedKeys.has(key)),
+      );
+    }
+
+    const index = new VersionIndex(rows);
+    const resolved = new Map<string, VersionResolution>();
+    for (const number of wanted) {
+      const resolution = resolveVersion(number, index);
+      if (resolution) resolved.set(number, resolution);
+    }
+    return resolved;
   }
 }
 
