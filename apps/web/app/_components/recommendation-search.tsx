@@ -1,18 +1,36 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { trpc } from "~/trpc/client";
 import { Dossier } from "./dashboard/dossier";
 import { IntakeScreen } from "./dashboard/intake-screen";
 import { LeftRail } from "./dashboard/left-rail";
+import { loadPersistedState, savePersistedState } from "./dashboard/persistence";
 import { TopBar } from "./dashboard/top-bar";
 import type { Entry } from "./dashboard/types";
 
 export function RecommendationSearch() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  // Restoring from localStorage happens in an effect (not a lazy useState
+  // initializer) so the first client render matches the server-rendered
+  // HTML — reading it eagerly would restore a dossier the server never
+  // rendered and trip a hydration mismatch.
+  const [restored, setRestored] = useState(false);
   const utils = trpc.useUtils();
+
+  useEffect(() => {
+    const persisted = loadPersistedState();
+    setEntries(persisted.entries);
+    setActiveId(persisted.activeId);
+    setRestored(true);
+  }, []);
+
+  useEffect(() => {
+    if (!restored) return;
+    savePersistedState(entries, activeId);
+  }, [entries, activeId, restored]);
 
   const submit = useCallback(
     (displayText: string, specText: string, fileName?: string) => {

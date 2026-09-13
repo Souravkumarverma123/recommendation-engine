@@ -6,6 +6,7 @@ import { ArrowRight, FileText, Loader2, AlertCircle, Paperclip, X } from "lucide
 import { cn } from "~/lib/utils";
 import { extractPdfText } from "~/lib/pdf";
 import { MAX_SPEC_CHARS, SUGGESTIONS } from "./labels";
+import { loadDraft, saveDraft } from "./persistence";
 import type { FileState } from "./types";
 
 function isSupportedAttachment(file: File): "pdf" | "text" | null {
@@ -23,6 +24,7 @@ export function IntakeScreen({
   hasHistory: boolean;
 }) {
   const [input, setInput] = useState("");
+  const [draftRestored, setDraftRestored] = useState(false);
   const [fileState, setFileState] = useState<FileState>({ status: "idle" });
   const [isDragActive, setIsDragActive] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -32,7 +34,20 @@ export function IntakeScreen({
 
   useEffect(() => {
     textareaRef.current?.focus();
+    // Restored after mount, not from a lazy useState initializer, so the
+    // first client render still matches the server-rendered empty textarea.
+    const draft = loadDraft();
+    if (draft) setInput(draft);
+    setDraftRestored(true);
   }, []);
+
+  useEffect(() => {
+    // Guard against saving the initial "" before the restore above has
+    // applied — otherwise this effect fires first and wipes the very
+    // draft it hasn't rendered yet.
+    if (!draftRestored) return;
+    saveDraft(input);
+  }, [input, draftRestored]);
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -104,6 +119,11 @@ export function IntakeScreen({
           .slice(0, MAX_SPEC_CHARS)
       : text;
 
+    // Cleared directly rather than left to the `[input]` effect below: this
+    // component unmounts as soon as `onSubmit` sets the parent's active
+    // entry, in the same render as `setInput("")` — so that effect would
+    // never get a chance to run with the emptied value.
+    saveDraft("");
     onSubmit(text || `Uploaded ${hasFile ? fileState.name : ""}`, specText, hasFile ? fileState.name : undefined);
     setInput("");
     handleRemoveFile();
@@ -277,7 +297,10 @@ export function IntakeScreen({
               <button
                 key={suggestion}
                 type="button"
-                onClick={() => onSubmit(suggestion, suggestion)}
+                onClick={() => {
+                  saveDraft("");
+                  onSubmit(suggestion, suggestion);
+                }}
                 className="flex items-center justify-between rounded-xl border border-hairline px-4 py-3.5 text-left text-[13.5px] text-body transition-colors hover:border-primary/40 hover:text-ink"
               >
                 {suggestion}
