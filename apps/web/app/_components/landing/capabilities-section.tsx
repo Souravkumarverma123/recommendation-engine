@@ -52,7 +52,7 @@ export function CapabilitiesSection() {
           </p>
         </div>
 
-        <div className="mt-12 grid grid-cols-1 gap-4 lg:grid-flow-dense lg:auto-rows-[210px] lg:grid-cols-4">
+        <div className="mt-12 grid grid-cols-1 gap-4 lg:grid-cols-4">
           {/* Regulatory badges — wide */}
           <div className="rounded-2xl border border-hairline bg-surface-card p-6 lg:col-span-2">
             <h3 className="text-[14.5px] font-semibold text-ink">
@@ -85,8 +85,8 @@ export function CapabilitiesSection() {
             </p>
           </div>
 
-          {/* Current edition — tall */}
-          <div className="flex flex-col rounded-2xl border border-hairline bg-surface-card p-6 lg:row-span-2">
+          {/* Current edition */}
+          <div className="flex flex-col rounded-2xl border border-hairline bg-surface-card p-6">
             <h3 className="text-[14.5px] font-semibold text-ink">
               Current edition, guaranteed
             </h3>
@@ -116,7 +116,7 @@ export function CapabilitiesSection() {
           </div>
 
           {/* Draft clause — wide */}
-          <div className="flex flex-col rounded-2xl border border-hairline bg-surface-card p-6 lg:col-span-2">
+          <div className="flex flex-col rounded-2xl border border-hairline bg-surface-card p-6 lg:col-span-3">
             <h3 className="text-[14.5px] font-semibold text-ink">
               Draft clause, ready to paste
             </h3>
