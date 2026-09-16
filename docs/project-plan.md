@@ -24,7 +24,7 @@
 - **LLM**: Claude Sonnet (reasoning) + Haiku (cheap steps), via Vercel AI SDK
 - **PDF**: Docling (throwaway Python batch / `docling-serve` container) — offline only
 - **Translation**: Claude/Gemini in v1
-- **Hosting**: Vercel + Supabase/Neon
+- **Hosting**: two Docker containers (`api`, `web`) behind Caddy on a single EC2 box, DB on Neon — see `docs/PRD.md` §Deployment
 
 ---
 

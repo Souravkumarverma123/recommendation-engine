@@ -166,7 +166,13 @@ Cement/concrete · Structural steel · Electronics/IT hardware · PPE/helmets ·
 
 ### Deployment
 
-`docker compose up` on a single AWS box (EC2/Lightsail). Full CI/CD to AWS is post-finale.
+`apps/api` and `apps/web` run as two containers via `docker-compose.prod.yml` on a single, already-provisioned EC2 box — no container registry, no GitHub Actions deploy job. `scripts/deploy.sh` runs on the box over SSH: `git pull` → `docker compose build` → `up -d`. Full CI/CD to AWS is post-finale.
+
+The database is **Neon** (external, managed) — the box runs no Postgres container in production; the local `pgvector/pgvector:pg16` container in `docker-compose.yml` is dev/test-only and must never share `DATABASE_URL` with prod. Migrations (`pnpm --filter @repo/database db:migrate`) are run by hand from a dev machine against Neon whenever the schema changes — `drizzle-kit` is a devDependency and is never present in the pruned production image.
+
+A **Caddy** container fronts both app containers on one domain, giving free automatic HTTPS once DNS points at the box and the EC2 security group allows inbound 80/443. Path-based routing (`/trpc*`, `/api*`, `/docs*`, `/openapi.json`, `/health` → `api`; everything else → `web`) keeps both apps same-origin, which is why `apps/api` must run with `NODE_ENV=prod` (not `production`) in this setup — it's the flag that turns off the permissive CORS used in dev.
+
+`apps/harvester` stays unhosted: a CLI script run manually against Neon from a dev machine, same trust model as migrations.
 
 ### Frontend
 
