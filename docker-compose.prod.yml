@@ -3,9 +3,7 @@
 # reached exclusively through it, on one domain, over HTTPS.
 services:
   api:
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
+    image: ghcr.io/souravkumarverma123/ultrahuman-api:latest
     restart: unless-stopped
     env_file: .env.production
     environment:
@@ -14,9 +12,7 @@ services:
       - "8000"
 
   web:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
+    image: ghcr.io/souravkumarverma123/ultrahuman-web:latest
     restart: unless-stopped
     env_file: .env.production
     environment:
