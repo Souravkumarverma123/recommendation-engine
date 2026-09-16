@@ -6,7 +6,7 @@
   // processes. DATABASE_URL is infra location (not a deterministic cache input), so
   // it is passed through rather than hashed. The DB-backed recommend.run seam (#8)
   // needs it; today no task reads it.
-  "globalPassThroughEnv": ["DATABASE_URL", "OPENAI_API_KEY", "VITEST"],
+  "globalPassThroughEnv": ["DATABASE_URL", "OPENAI_API_KEY", "VITEST", "NEXT_PUBLIC_API_URL"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
