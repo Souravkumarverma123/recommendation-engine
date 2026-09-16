@@ -166,7 +166,7 @@ Cement/concrete · Structural steel · Electronics/IT hardware · PPE/helmets ·
 
 ### Deployment
 
-`apps/api` and `apps/web` run as two containers via `docker-compose.prod.yml` on a single, already-provisioned EC2 box — no container registry, no GitHub Actions deploy job. `scripts/deploy.sh` runs on the box over SSH: `git pull` → `docker compose build` → `up -d`. Full CI/CD to AWS is post-finale.
+`apps/api` and `apps/web` run as two containers via `docker-compose.prod.yml` on a single, already-provisioned EC2 box. Images are built once in CI (GitHub Actions, via `docker/build-push-action`) and pushed to GitHub Container Registry (`ghcr.io`) tagged `latest` + the commit SHA; the `deploy` job then SCPs the compose file + Caddyfile to the box and runs `docker compose pull && up -d` over SSH — the box never compiles anything itself. `scripts/deploy.sh` on the box is a manual fallback for the same pull-and-restart, for when you want to force it without a new commit.
 
 The database is **Neon** (external, managed) — the box runs no Postgres container in production; the local `pgvector/pgvector:pg16` container in `docker-compose.yml` is dev/test-only and must never share `DATABASE_URL` with prod. Migrations (`pnpm --filter @repo/database db:migrate`) are run by hand from a dev machine against Neon whenever the schema changes — `drizzle-kit` is a devDependency and is never present in the pruned production image.
 
